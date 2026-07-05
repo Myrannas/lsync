@@ -7,6 +7,11 @@ import {
 } from "lsync-transport";
 import { observable } from "@trpc/server/observable";
 import type {
+  ApiCall,
+  ApiCallArgs,
+  ApiContract,
+  ApiOutput,
+  ApiPath,
   Batch,
   Broadcast,
   Client,
@@ -23,7 +28,21 @@ interface PendingRequest {
   reject: (error: Error) => void;
 }
 
-export function createClient(options: ClientOptions): Client {
+interface SharedClientEntry {
+  client: Client;
+  refs: number;
+}
+
+export interface SharedClientLease<TApi extends ApiContract = ApiContract> {
+  readonly client: Client<TApi>;
+  release(): void;
+}
+
+const sharedClients = new Map<string, SharedClientEntry>();
+
+export function createClient<TApi extends ApiContract = ApiContract>(
+  options: ClientOptions,
+): Client<TApi> {
   const clientId = options.clientId ?? crypto.randomUUID();
   const listeners = new Set<(broadcast: Broadcast) => void>();
   const pending = new Map<string, PendingRequest>();
@@ -135,12 +154,19 @@ export function createClient(options: ClientOptions): Client {
     read: {
       query: <T = unknown>(query: ReadQuery) => Promise<ReadResult<T>>;
     };
+    api: {
+      mutate: <TResult = unknown>(call: ApiCall) => Promise<TResult>;
+    };
   };
 
   return {
     clientId,
     push: (batch) => trpc.push.mutate(batch),
     read: (query) => trpc.read.query(query),
+    call: <TPath extends ApiPath<TApi>>(path: TPath, ...args: ApiCallArgs<TApi, TPath>) => {
+      const [input] = args;
+      return trpc.api.mutate<ApiOutput<TApi, TPath>>({ path, input });
+    },
     subscribe(listener) {
       listeners.add(listener);
       void open();
@@ -149,6 +175,44 @@ export function createClient(options: ClientOptions): Client {
     close() {
       socket?.close();
       socket = undefined;
+    },
+  };
+}
+
+export function acquireSharedClient<TApi extends ApiContract = ApiContract>(
+  options: ClientOptions,
+): SharedClientLease<TApi> {
+  const key = sharedClientKey(options);
+  let entry = sharedClients.get(key);
+
+  if (!entry) {
+    entry = {
+      client: createClient({
+        url: options.url,
+        ...(options.clientId ? { clientId: options.clientId } : {}),
+      }),
+      refs: 0,
+    };
+    sharedClients.set(key, entry);
+  }
+
+  entry.refs += 1;
+
+  let released = false;
+  return {
+    client: entry.client as Client<TApi>,
+    release() {
+      if (released) {
+        return;
+      }
+
+      released = true;
+      entry.refs -= 1;
+
+      if (entry.refs === 0 && sharedClients.get(key) === entry) {
+        sharedClients.delete(key);
+        entry.client.close();
+      }
     },
   };
 }
@@ -194,5 +258,24 @@ function requestForOperation(
     };
   }
 
+  if (op.type === "mutation" && op.path === "api") {
+    return {
+      id,
+      method: "mutation",
+      params: {
+        path: "api",
+        input: {
+          json: op.input as ApiCall,
+        },
+      },
+    };
+  }
+
   throw new Error(`Unsupported operation: ${op.type}.${op.path}`);
+}
+
+function sharedClientKey(options: ClientOptions): string {
+  const url = new URL(options.url);
+  url.searchParams.delete("clientId");
+  return `${url.toString()}\0${options.clientId ?? ""}`;
 }

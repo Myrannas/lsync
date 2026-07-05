@@ -1,7 +1,7 @@
 import type { CollectionConfig, InferSchemaOutput, LoadSubsetOptions } from "@tanstack/db";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { createBatch, toChangeMessage } from "./batch";
-import { createClient } from "./client";
+import { acquireSharedClient } from "./client";
 import { initialReadQuery, readQueryForSubset, subsetId } from "./read-query";
 import type { CollectionOptions } from "./types";
 import { SubsetTracker, writeRows } from "./subsets";
@@ -30,10 +30,20 @@ export function collectionOptions<
   TKey extends string | number,
   TSchema extends StandardSchemaV1,
 >(options: CollectionOptions<T, TKey, TSchema>): CollectionConfig<T, TKey, TSchema> {
-  const client = createClient({
-    url: options.url,
-    ...(options.clientId ? { clientId: options.clientId } : {}),
-  });
+  let lease: ReturnType<typeof acquireSharedClient> | undefined;
+  let client = options.client;
+
+  if (!client) {
+    if (!options.url) {
+      throw new Error("collectionOptions requires either client or url");
+    }
+
+    lease = acquireSharedClient({
+      url: options.url,
+      ...(options.clientId ? { clientId: options.clientId } : {}),
+    });
+    client = lease.client;
+  }
 
   return {
     ...(options.id ? { id: options.id } : {}),
@@ -41,6 +51,10 @@ export function collectionOptions<
     ...(options.schema ? { schema: options.schema } : {}),
     ...(options.startSync !== undefined ? { startSync: options.startSync } : {}),
     ...(options.syncMode ? { syncMode: options.syncMode } : {}),
+    ...(options.autoIndex !== undefined ? { autoIndex: options.autoIndex } : {}),
+    ...(options.defaultIndexType !== undefined
+      ? { defaultIndexType: options.defaultIndexType }
+      : {}),
     getKey: options.getKey,
     sync: {
       sync: ({ begin, write, commit, markReady, collection }) => {
@@ -168,7 +182,7 @@ export function collectionOptions<
               retentionTimers.clear();
               subsets.clear();
               unsubscribe();
-              client.close();
+              lease?.release();
             },
           };
         }
@@ -189,7 +203,7 @@ export function collectionOptions<
 
         return () => {
           unsubscribe();
-          client.close();
+          lease?.release();
         };
       },
       rowUpdateMode: "partial",

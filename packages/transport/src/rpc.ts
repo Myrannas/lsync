@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { batchSchema, broadcastSchema, readQuerySchema } from "./api";
+import { apiCallSchema, batchSchema, broadcastSchema, readQuerySchema } from "./api";
 
 export const rpcIdSchema = z.union([z.string(), z.number()]).nullable().optional();
 
@@ -29,9 +29,21 @@ const clientRpcQueryRequestSchema = z.object({
   }),
 });
 
-export const clientRpcRequestSchema = z.discriminatedUnion("method", [
+const clientRpcApiCallRequestSchema = z.object({
+  id: rpcIdSchema,
+  method: z.literal("mutation"),
+  params: z.object({
+    path: z.literal("api"),
+    input: z.object({
+      json: apiCallSchema,
+    }),
+  }),
+});
+
+export const clientRpcRequestSchema = z.union([
   clientRpcMutationRequestSchema,
   clientRpcQueryRequestSchema,
+  clientRpcApiCallRequestSchema,
 ]);
 
 export const rpcResultMessageSchema = z.object({

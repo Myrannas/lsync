@@ -45,7 +45,7 @@ export function ensureSQLiteJsonTables(
     }
 
     const table = tableName(collectionName, collection.storage);
-    sql.exec(`
+    const result = sql.exec(`
       CREATE TABLE IF NOT EXISTS ${quoteIdentifier(table)} (
         key TEXT PRIMARY KEY,
         path TEXT NOT NULL,
@@ -58,6 +58,21 @@ export function ensureSQLiteJsonTables(
 
     for (const index of collection.storage.indexes) {
       sql.exec(createIndexSql(table, index));
+    }
+
+    if ((result as unknown as { rowsWritten: number }).rowsWritten > 0) {
+      if (collection.initialData) {
+        const insertSql = `INSERT INTO ${quoteIdentifier(table)} (key, path, value, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`;
+        for (const data of collection.initialData) {
+          const key = String(data.id);
+          const path = "";
+          const value = JSON.stringify(data);
+          const version = 1;
+          const createdAt = new Date().toISOString();
+          const updatedAt = createdAt;
+          sql.exec(insertSql, key, path, value, version, createdAt, updatedAt);
+        }
+      }
     }
   }
 }

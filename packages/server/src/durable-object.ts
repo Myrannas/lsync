@@ -1,11 +1,17 @@
 import { parseClientRpcRequest, readRpcId, sendServerMessage, type RpcId } from "lsync-transport";
 import { router } from "./router";
 import {
+  type ApiCall,
+  type ApiContract,
+  type ApiHandlerArgs,
+  type ApiHandlers,
   type Batch,
   type Broadcast,
   type CollectionConfigs,
+  type PushResult,
   type ReadQuery,
   type ReadResult,
+  webSocketAttachmentSchema,
   type WebSocketAttachment,
 } from "./types";
 import { applySQLiteJsonBatch, readSQLiteJsonRows } from "./storage";
@@ -15,15 +21,18 @@ export interface Env {
   SYNC_SHARDS: DurableObjectNamespace;
 }
 
-export interface CollectionShardOptions {
+export interface CollectionShardOptions<TApi extends ApiContract = ApiContract> {
   collections?: CollectionConfigs;
+  api?: ApiHandlers<TApi>;
 }
 
-export class CollectionShardDurableObject implements DurableObject {
+export class CollectionShardDurableObject<
+  TApi extends ApiContract = ApiContract,
+> implements DurableObject {
   constructor(
     private readonly state: DurableObjectState,
     private readonly env: Env,
-    private readonly options: CollectionShardOptions = {},
+    private readonly options: CollectionShardOptions<TApi> = {},
   ) {}
 
   async fetch(request: Request): Promise<Response> {
@@ -62,12 +71,10 @@ export class CollectionShardDurableObject implements DurableObject {
         persist: (input) => this.persist(input),
         publish: (input) => this.publish(input),
         read: (input) => this.read(input),
+        callApi: (input) => this.callApi(ws, input),
       });
 
-      const result =
-        request.method === "mutation"
-          ? await caller.push(request.params.input.json)
-          : await caller.read(request.params.input.json);
+      const result = await callRouter(caller, request);
       this.sendRpcResult(ws, request.id, result);
     } catch (error) {
       this.sendRpcError(ws, readRpcId(text), error);
@@ -104,16 +111,53 @@ export class CollectionShardDurableObject implements DurableObject {
     }
   }
 
-  private validate(batch: Batch): void {
+  protected validate(batch: Batch): void {
     validateBatch(batch, this.options.collections);
   }
 
-  private persist(batch: Batch): void {
+  protected persist(batch: Batch): void {
     applySQLiteJsonBatch(this.state.storage.sql, batch, this.options.collections);
   }
 
-  private read(query: ReadQuery): ReadResult {
+  protected read(query: ReadQuery): ReadResult {
     return readSQLiteJsonRows(this.state.storage.sql, query, this.options.collections);
+  }
+
+  private async callApi(ws: WebSocket, call: ApiCall): Promise<unknown> {
+    const handler = this.options.api?.[call.path];
+
+    if (!handler) {
+      throw new Error(`Unknown API path: ${call.path}`);
+    }
+
+    const clientId = this.clientId(ws);
+    const args: ApiHandlerArgs = {
+      shardId: this.shardId(),
+      input: call.input,
+      validate: (input) => this.validate(input),
+      persist: (input) => this.persist(input),
+      publish: (input) => this.publish(input),
+      mutate: (input) => this.mutate(input),
+      read: (input) => this.read(input),
+    };
+
+    if (clientId) {
+      args.clientId = clientId;
+    }
+
+    return handler(args);
+  }
+
+  private mutate(batch: Batch): PushResult {
+    this.validate(batch);
+    this.persist(batch);
+    this.publish(batch);
+    return { accepted: batch.updates.length };
+  }
+
+  private clientId(ws: WebSocket): string | undefined {
+    const result = webSocketAttachmentSchema.safeParse(ws.deserializeAttachment());
+    return result.success ? result.data.clientId : undefined;
   }
 
   private shardId(): string {
@@ -141,6 +185,21 @@ export class CollectionShardDurableObject implements DurableObject {
       },
     });
   }
+}
+
+function callRouter(
+  caller: ReturnType<typeof router.createCaller>,
+  request: ReturnType<typeof parseClientRpcRequest>,
+): unknown {
+  if (request.method === "query") {
+    return caller.read(request.params.input.json);
+  }
+
+  if (request.params.path === "push") {
+    return caller.push(request.params.input.json);
+  }
+
+  return caller.api(request.params.input.json);
 }
 
 export interface WorkerOptions {

@@ -1,4 +1,4 @@
-import { createCollection, eq } from "@tanstack/db";
+import { BasicIndex, createCollection, eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { collectionOptions } from "lsync-tanstack-db";
 import React, { useState } from "react";
@@ -21,6 +21,7 @@ import "./styles.css";
 const todoSchema = z.object({
   id: z.string(),
   text: z.string(),
+  createdBy: z.string(),
   completed: z.boolean(),
 });
 
@@ -30,6 +31,22 @@ type TodoFilter = "open" | "completed";
 const shardId = new URLSearchParams(window.location.search).get("shard") ?? "demo";
 const workerUrl = import.meta.env.VITE_SYNC_URL ?? "ws://localhost:8787";
 const syncUrl = `${workerUrl.replace(/\/$/, "")}/sync/${encodeURIComponent(shardId)}`;
+
+const users = createCollection(
+  collectionOptions({
+    id: "users",
+    collection: "users",
+    url: syncUrl,
+    schema: z.object({
+      id: z.string(),
+      name: z.string(),
+    }),
+    getKey: (user) => user.id,
+    syncMode: "on-demand",
+    autoIndex: "eager",
+    defaultIndexType: BasicIndex,
+  }),
+);
 
 const todos = createCollection(
   collectionOptions({
@@ -51,8 +68,15 @@ function App() {
     (query) =>
       query
         .from({ todo: todos })
-        .where((row) => eq(row.todo.completed, showCompleted))
-        .orderBy((row) => row.todo.text),
+        .join({ user: users }, ({ user, todo }) => eq(user.id, todo.createdBy))
+        .where(({ todo }) => eq(todo.completed, showCompleted))
+        .orderBy(({ todo }) => todo.text)
+        .select(({ user, todo }) => ({
+          id: todo.id,
+          text: todo.text,
+          createdBy: user.name ?? "Current user",
+          completed: todo.completed,
+        })),
     [showCompleted],
   );
 
@@ -108,6 +132,7 @@ function App() {
               id: crypto.randomUUID(),
               text: trimmed,
               completed: false,
+              createdBy: "current-user",
             });
             setText("");
           }}
@@ -147,9 +172,12 @@ function App() {
                   {todo.text}
                 </Label>
               </div>
-              <Button type="button" onClick={() => todos.delete(todo.id)} variant="ghost">
-                Delete
-              </Button>
+              <div>
+                {todo.createdBy ? <Badge variant="secondary">{todo.createdBy}</Badge> : null}
+                <Button type="button" onClick={() => todos.delete(todo.id)} variant="ghost">
+                  Delete
+                </Button>
+              </div>
             </li>
           ))}
         </ul>

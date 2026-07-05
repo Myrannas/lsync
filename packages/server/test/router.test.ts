@@ -24,6 +24,7 @@ describe("router", () => {
       persist: () => calls.push("persist"),
       publish: () => calls.push("publish"),
       read: () => ({ rows: [] }),
+      callApi: () => undefined,
     });
 
     await expect(caller.push(batch)).resolves.toEqual({ accepted: 1 });
@@ -39,6 +40,7 @@ describe("router", () => {
       read: (query) => ({
         rows: [{ id: "1", collection: query.collection }],
       }),
+      callApi: () => undefined,
     });
 
     await expect(
@@ -48,6 +50,30 @@ describe("router", () => {
       }),
     ).resolves.toEqual({
       rows: [{ id: "1", collection: "todos" }],
+    });
+  });
+
+  it("dispatches custom API calls through the configured context", async () => {
+    const caller = router.createCaller({
+      shardId: "shard-1",
+      validate: () => undefined,
+      persist: () => undefined,
+      publish: () => undefined,
+      read: () => ({ rows: [] }),
+      callApi: (call) => ({
+        path: call.path,
+        input: call.input,
+      }),
+    });
+
+    await expect(
+      caller.api({
+        path: "completeAll",
+        input: { collection: "todos" },
+      }),
+    ).resolves.toEqual({
+      path: "completeAll",
+      input: { collection: "todos" },
     });
   });
 });

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { collectionOptions, createBatch } from "../src/index";
+import { collectionOptions, createBatch, createClient } from "../src/index";
+import { acquireSharedClient } from "../src/client";
+import { BasicIndex } from "@tanstack/db";
 import type { PendingMutation, TransactionWithMutations } from "@tanstack/db";
+import type { ApiRoute, Client } from "../src/index";
 
 interface Todo {
   id: string;
@@ -14,6 +17,23 @@ const todoSchema = z.object({
   text: z.string(),
   completed: z.boolean(),
 });
+
+type TodoApi = {
+  completeAll: ApiRoute<{ completed: boolean }, { accepted: number }>;
+  ping: ApiRoute<undefined, { ok: true }>;
+};
+
+function typedApiExamples(client: Client<TodoApi>) {
+  const completeAll = client.call("completeAll", { completed: true });
+  const ping = client.call("ping");
+
+  return {
+    completeAll,
+    ping,
+  };
+}
+
+void typedApiExamples;
 
 function transaction(
   mutation: Partial<PendingMutation<Todo>> & Pick<PendingMutation<Todo>, "type">,
@@ -68,6 +88,69 @@ describe("collectionOptions", () => {
 
     expect(options.syncMode).toBe("on-demand");
     expect(options.startSync).toBe(true);
+  });
+
+  it("passes through local index hints", () => {
+    const options = collectionOptions({
+      id: "todos",
+      collection: "todos",
+      url: "ws://localhost:8787/sync/demo",
+      getKey: (todo: Todo) => todo.id,
+      schema: todoSchema,
+      autoIndex: "eager",
+      defaultIndexType: BasicIndex,
+    });
+
+    expect(options.autoIndex).toBe("eager");
+    expect(options.defaultIndexType).toBe(BasicIndex);
+  });
+
+  it("can use a caller-owned shard client", () => {
+    const client = createClient<TodoApi>({
+      url: "ws://localhost:8787/sync/caller-owned",
+    });
+
+    const options = collectionOptions({
+      id: "todos",
+      collection: "todos",
+      client,
+      getKey: (todo: Todo) => todo.id,
+      schema: todoSchema,
+    });
+
+    expect(options.id).toBe("todos");
+    client.close();
+  });
+});
+
+describe("acquireSharedClient", () => {
+  it("reuses clients for the same implicit shard connection", () => {
+    const first = acquireSharedClient({
+      url: "ws://localhost:8787/sync/shared?clientId=ignored",
+    });
+    const second = acquireSharedClient({
+      url: "ws://localhost:8787/sync/shared",
+    });
+
+    expect(first.client).toBe(second.client);
+    expect(first.client.clientId).toBe(second.client.clientId);
+
+    first.release();
+    second.release();
+  });
+
+  it("uses separate clients for different shards", () => {
+    const first = acquireSharedClient({
+      url: "ws://localhost:8787/sync/shared-a",
+    });
+    const second = acquireSharedClient({
+      url: "ws://localhost:8787/sync/shared-b",
+    });
+
+    expect(first.client).not.toBe(second.client);
+
+    first.release();
+    second.release();
   });
 });
 

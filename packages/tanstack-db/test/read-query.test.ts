@@ -1,3 +1,4 @@
+import { createCollection, createLiveQueryCollection, eq } from "@tanstack/db";
 import type { LoadSubsetOptions } from "@tanstack/db";
 import { describe, expect, it } from "vite-plus/test";
 import { initialReadQuery, readQueryForSubset, subsetId } from "../src/read-query";
@@ -101,6 +102,47 @@ describe("readQueryForSubset", () => {
     });
   });
 
+  it("unwraps TanStack expression wrappers and negates not expressions", () => {
+    const query = readQueryForSubset("todos", undefined, {
+      where: {
+        expression: {
+          type: "func",
+          name: "not",
+          args: [
+            {
+              type: "func",
+              name: "eq",
+              args: [
+                { type: "ref", path: ["completed"] },
+                { type: "val", value: true },
+              ],
+            },
+          ],
+        },
+        residual: true,
+      },
+      orderBy: [
+        {
+          expression: {
+            expression: { type: "ref", path: ["priority"] },
+          },
+          compareOptions: { direction: "asc", nulls: "last" },
+        },
+      ],
+    } as unknown as LoadSubsetOptions);
+
+    expect(query).toMatchObject({
+      collection: "todos",
+      predicate: {
+        type: "comparison",
+        field: "completed",
+        op: "ne",
+        value: true,
+      },
+      orderBy: [{ field: "priority", direction: "asc" }],
+    });
+  });
+
   it("converts cursor expressions into server read cursor predicates", () => {
     const query = readQueryForSubset("todos", undefined, {
       cursor: {
@@ -177,5 +219,51 @@ describe("readQueryForSubset", () => {
     });
     expect(query.limit).toBe(10);
     expect(query).not.toHaveProperty("offset");
+  });
+
+  it("serializes source predicates from live query collections", async () => {
+    let loaded: LoadSubsetOptions | undefined;
+    const todos = createCollection<{ id: string; completed: boolean }>({
+      id: "todos-live-source",
+      getKey: (todo) => todo.id,
+      syncMode: "on-demand",
+      sync: {
+        sync: ({ markReady }) => {
+          markReady();
+          return {
+            loadSubset: (options) => {
+              loaded = options;
+              return true;
+            },
+          };
+        },
+      },
+    });
+
+    const liveTodos = createLiveQueryCollection({
+      id: "todos-live-filtered",
+      query: (query) =>
+        query
+          .from({ todo: todos })
+          .where(({ todo }) => eq(todo.completed, false))
+          .select(({ todo }) => ({
+            id: todo.id,
+            completed: todo.completed,
+          })),
+      getKey: (todo) => todo.id,
+    });
+
+    await liveTodos.preload();
+
+    expect(loaded?.where).toBeDefined();
+    expect(readQueryForSubset("todos", undefined, loaded ?? {})).toMatchObject({
+      collection: "todos",
+      predicate: {
+        type: "comparison",
+        field: "completed",
+        op: "eq",
+        value: false,
+      },
+    });
   });
 });

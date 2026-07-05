@@ -1,7 +1,9 @@
 import { initTRPC } from "@trpc/server";
 import {
+  apiCallSchema,
   batchSchema,
   readQuerySchema,
+  type ApiCall,
   type Batch,
   type PushResult,
   type ReadQuery,
@@ -14,6 +16,7 @@ export interface Context {
   persist: (batch: Batch) => void;
   publish: (batch: Batch) => void;
   read: (query: ReadQuery) => ReadResult;
+  callApi: (call: ApiCall) => unknown;
 }
 
 const t = initTRPC.context<Context>().create();
@@ -27,6 +30,9 @@ export const router = t.router({
   }),
   read: t.procedure.input(readQuerySchema).query(({ ctx, input }): ReadResult => {
     return ctx.read(normalizeReadQuery(input));
+  }),
+  api: t.procedure.input(apiCallSchema).mutation(({ ctx, input }): unknown => {
+    return ctx.callApi(input);
   }),
 });
 

@@ -83,6 +83,11 @@ export const pushResultSchema = z.object({
   accepted: z.number().int().nonnegative(),
 });
 
+export const apiCallSchema = z.object({
+  path: z.string().min(1),
+  input: z.unknown().optional(),
+});
+
 export const broadcastSchema = z.object({
   type: z.literal("updates"),
   shardId: z.string(),
@@ -104,6 +109,26 @@ export type ReadCursor = z.output<typeof readCursorSchema>;
 export type ReadCursorInput = z.input<typeof readCursorSchema>;
 export type ReadOrderBy = z.output<typeof readOrderBySchema>;
 export type ReadOrderByInput = z.input<typeof readOrderBySchema>;
+export type ApiCall = z.output<typeof apiCallSchema>;
+export type ApiCallInput = z.input<typeof apiCallSchema>;
+
+export interface ApiRoute<TInput = unknown, TOutput = unknown> {
+  input: TInput;
+  output: TOutput;
+}
+
+export type ApiContract = Record<string, ApiRoute>;
+export type ApiPath<TApi extends ApiContract> = Extract<keyof TApi, string>;
+export type ApiInput<TApi extends ApiContract, TPath extends ApiPath<TApi>> = TApi[TPath]["input"];
+export type ApiOutput<
+  TApi extends ApiContract,
+  TPath extends ApiPath<TApi>,
+> = TApi[TPath]["output"];
+export type ApiCallArgs<TApi extends ApiContract, TPath extends ApiPath<TApi>> =
+  undefined extends ApiInput<TApi, TPath>
+    ? [input?: ApiInput<TApi, TPath>]
+    : [input: ApiInput<TApi, TPath>];
+
 export interface ReadQuery {
   collection: string;
   filters?: Array<ReadFilter>;

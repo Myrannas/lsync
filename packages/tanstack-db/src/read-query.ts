@@ -89,26 +89,68 @@ function combinePredicates(
 }
 
 function toReadPredicate(expression: unknown): ReadPredicate {
-  if (!isFuncExpression(expression)) {
+  const unwrapped = unwrapExpression(expression);
+
+  if (!isFuncExpression(unwrapped)) {
     throw new Error("On-demand cursor predicates must be function expressions");
   }
 
-  if (expression.name === "and" || expression.name === "or") {
+  if (unwrapped.name === "and" || unwrapped.name === "or") {
     return {
-      type: expression.name,
-      predicates: expression.args.map(toReadPredicate),
+      type: unwrapped.name,
+      predicates: unwrapped.args.map(toReadPredicate),
     };
   }
 
-  const comparison = comparisonFromExpression(expression);
+  if (unwrapped.name === "not") {
+    return negatePredicate(toReadPredicate(unwrapped.args[0]));
+  }
+
+  const comparison = comparisonFromExpression(unwrapped);
   if (!comparison) {
-    throw new Error(`Unsupported on-demand cursor operator: ${expression.name}`);
+    throw new Error(`Unsupported on-demand cursor operator: ${unwrapped.name}`);
   }
 
   return {
     type: "comparison",
     ...comparison,
   };
+}
+
+function negatePredicate(predicate: ReadPredicate): ReadPredicate {
+  if (predicate.type === "and" || predicate.type === "or") {
+    return {
+      type: predicate.type === "and" ? "or" : "and",
+      predicates: predicate.predicates.map(negatePredicate),
+    };
+  }
+
+  const comparison = predicate as ReadComparisonPredicate;
+  return {
+    ...comparison,
+    op: negateOperator(comparison.op),
+  };
+}
+
+function negateOperator(operator: ReadComparisonPredicate["op"]): ReadComparisonPredicate["op"] {
+  switch (operator) {
+    case "eq":
+      return "ne";
+    case "ne":
+      return "eq";
+    case "gt":
+      return "lte";
+    case "gte":
+      return "lt";
+    case "lt":
+      return "gte";
+    case "lte":
+      return "gt";
+    case "in":
+      throw new Error("Unsupported on-demand cursor operator: not(in)");
+    default:
+      throw new Error("Unsupported on-demand cursor operator");
+  }
 }
 
 function comparisonFromExpression(
@@ -129,12 +171,13 @@ function comparisonFromExpression(
 
 function toReadOrderByList(orderBy: LoadSubsetOptions["orderBy"]): Array<ReadOrderBy> {
   return (orderBy ?? []).map((sort) => {
-    if (!isRefExpression(sort.expression)) {
+    const expression = unwrapExpression(sort.expression);
+    if (!isRefExpression(expression)) {
       throw new Error(`On-demand orderBy must be a field reference`);
     }
 
     return toReadOrderBy({
-      field: sort.expression.path,
+      field: expression.path,
       direction: sort.compareOptions.direction,
     });
   });
@@ -180,6 +223,20 @@ interface Expression {
 }
 
 type FuncExpression = Expression & { args: Array<unknown>; name: string; type: "func" };
+type RefExpression = Expression & { path: Array<string | number>; type: "ref" };
+
+function unwrapExpression(value: unknown): unknown {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "expression" in value &&
+    isExpression((value as { expression: unknown }).expression)
+  ) {
+    return (value as { expression: unknown }).expression;
+  }
+
+  return value;
+}
 
 function isExpression(value: unknown): value is Expression {
   return typeof value === "object" && value !== null && "type" in value;
@@ -194,7 +251,7 @@ function isFuncExpression(value: unknown): value is FuncExpression {
   );
 }
 
-function isRefExpression(value: unknown): value is Expression & { path: Array<string | number> } {
+function isRefExpression(value: unknown): value is RefExpression {
   return isExpression(value) && value.type === "ref" && Array.isArray(value.path);
 }
 

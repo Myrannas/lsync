@@ -1,6 +1,14 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { BaseCollectionConfig } from "@tanstack/db";
 import type {
+  ApiCall as TransportApiCall,
+  ApiCallArgs as TransportApiCallArgs,
+  ApiCallInput as TransportApiCallInput,
+  ApiContract as TransportApiContract,
+  ApiInput as TransportApiInput,
+  ApiOutput as TransportApiOutput,
+  ApiPath as TransportApiPath,
+  ApiRoute as TransportApiRoute,
   Batch as TransportBatch,
   Broadcast as TransportBroadcast,
   PushResult as TransportPushResult,
@@ -14,6 +22,23 @@ import type {
 } from "lsync-transport";
 
 export type Update = TransportUpdate;
+export type ApiCall = TransportApiCall;
+export type ApiCallArgs<
+  TApi extends ApiContract,
+  TPath extends ApiPath<TApi>,
+> = TransportApiCallArgs<TApi, TPath>;
+export type ApiCallInput = TransportApiCallInput;
+export type ApiContract = TransportApiContract;
+export type ApiInput<TApi extends ApiContract, TPath extends ApiPath<TApi>> = TransportApiInput<
+  TApi,
+  TPath
+>;
+export type ApiOutput<TApi extends ApiContract, TPath extends ApiPath<TApi>> = TransportApiOutput<
+  TApi,
+  TPath
+>;
+export type ApiPath<TApi extends ApiContract> = TransportApiPath<TApi>;
+export type ApiRoute<TInput = unknown, TOutput = unknown> = TransportApiRoute<TInput, TOutput>;
 export type Batch = TransportBatch;
 export type Broadcast = TransportBroadcast;
 export type PushResult = TransportPushResult;
@@ -30,28 +55,44 @@ export interface ClientOptions {
   reconnect?: boolean;
 }
 
-export interface CollectionOptions<
+export type CollectionConnectionOptions =
+  | {
+      url: string | URL;
+      clientId?: string;
+      client?: never;
+    }
+  | {
+      client: Client;
+      url?: never;
+      clientId?: never;
+    };
+
+export type CollectionOptions<
   T extends object,
   TKey extends string | number,
   TSchema extends StandardSchemaV1 = never,
-> {
+> = {
   id?: string;
   gcTime?: BaseCollectionConfig<T, TKey, TSchema>["gcTime"];
   startSync?: BaseCollectionConfig<T, TKey, TSchema>["startSync"];
   syncMode?: BaseCollectionConfig<T, TKey, TSchema>["syncMode"];
+  autoIndex?: BaseCollectionConfig<T, TKey, TSchema>["autoIndex"];
+  defaultIndexType?: BaseCollectionConfig<T, TKey, TSchema>["defaultIndexType"];
   collection: string;
-  url: string | URL;
-  clientId?: string;
   getKey: (item: T) => TKey;
   schema?: TSchema;
   ignoreOwnUpdates?: boolean;
   read?: false | Omit<ReadQuery, "collection">;
-}
+} & CollectionConnectionOptions;
 
-export interface Client {
+export interface Client<TApi extends ApiContract = ApiContract> {
   readonly clientId: string;
   push(batch: Batch): Promise<PushResult>;
   read<T = unknown>(query: ReadQuery): Promise<ReadResult<T>>;
+  call<TPath extends ApiPath<TApi>>(
+    path: TPath,
+    ...args: ApiCallArgs<TApi, TPath>
+  ): Promise<ApiOutput<TApi, TPath>>;
   subscribe(listener: (broadcast: Broadcast) => void): () => void;
   close(): void;
 }
