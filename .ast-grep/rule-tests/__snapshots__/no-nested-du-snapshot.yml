@@ -1,0 +1,41 @@
+id: no-nested-du
+snapshots:
+  ? |
+    const schema = z.discriminatedUnion("kind", [
+      itemSchema,
+      z.lazy(() => otherSchema),
+    ]);
+  : labels:
+      - source: lazy
+        message: Inline zod methods are not allowed in discriminated union options
+        style: primary
+        start: 64
+        end: 68
+  ? |
+    const schema = z.discriminatedUnion("kind", [
+      itemSchema,
+      z.object({
+        kind: z.literal("other"),
+      }).extend({
+        name: z.string(),
+      }),
+    ]);
+  : labels:
+      - source: object
+        message: Inline zod methods are not allowed in discriminated union options
+        style: primary
+        start: 64
+        end: 70
+  ? |
+    const schema = z.discriminatedUnion("kind", [
+      z.object({
+        kind: z.literal("item"),
+      }),
+      otherSchema,
+    ]);
+  : labels:
+      - source: object
+        message: Inline zod methods are not allowed in discriminated union options
+        style: primary
+        start: 50
+        end: 56

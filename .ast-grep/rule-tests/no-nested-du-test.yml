@@ -1,0 +1,39 @@
+id: no-nested-du
+valid:
+  - |
+    const itemSchema = z.object({
+      kind: z.literal("item"),
+    });
+
+    const schema = z.discriminatedUnion("kind", [
+      itemSchema,
+      otherSchema,
+    ]);
+  - |
+    const schema = z.union([
+      z.object({
+        kind: z.literal("item"),
+      }),
+    ]);
+invalid:
+  - |
+    const schema = z.discriminatedUnion("kind", [
+      z.object({
+        kind: z.literal("item"),
+      }),
+      otherSchema,
+    ]);
+  - |
+    const schema = z.discriminatedUnion("kind", [
+      itemSchema,
+      z.lazy(() => otherSchema),
+    ]);
+  - |
+    const schema = z.discriminatedUnion("kind", [
+      itemSchema,
+      z.object({
+        kind: z.literal("other"),
+      }).extend({
+        name: z.string(),
+      }),
+    ]);
