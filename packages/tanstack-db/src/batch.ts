@@ -41,7 +41,7 @@ function toUpdate<T extends object>(
     return {
       ...base,
       type: "update",
-      value: mutation.changes,
+      value: mutation.modified,
       previousValue: mutation.original,
     };
   }

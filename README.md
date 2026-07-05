@@ -73,9 +73,27 @@ const todos = createCollection(
 );
 ```
 
-The optional `read` setting loads an initial SQLite-backed snapshot before the collection is
-marked ready. Filters support `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, and `in` against JSON fields
-such as `completed` or `owner.id`.
+For on-demand loading, set `syncMode: "on-demand"`. The adapter returns TanStack DB's
+`loadSubset`/`unloadSubset` handlers, so live queries request SQLite-backed snapshots only for
+the predicates they need:
+
+```ts
+const todos = createCollection(
+  collectionOptions({
+    id: "todos",
+    collection: "todos",
+    url: "ws://localhost:8787/sync/demo",
+    getKey: (todo) => todo.id,
+    schema: todoSchema,
+    syncMode: "on-demand",
+    startSync: true,
+  }),
+);
+```
+
+On-demand reads support simple AND-ed field comparisons (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`,
+and `in`), `limit`, `offset`, JSON-field `orderBy`, and TanStack DB cursor predicates for
+ordered pagination.
 
 ## Notes
 

@@ -1,12 +1,11 @@
 import type {
   Batch,
   CollectionConfigs,
-  ReadFilter,
-  ReadQuery,
-  ReadResult,
   SQLiteJsonIndexConfig,
   SQLiteJsonStorageConfig,
 } from "./types";
+
+export { readSQLiteJsonRows } from "./sqlite-json-read";
 
 export type SqlStorageValue = ArrayBuffer | string | number | null;
 
@@ -127,52 +126,6 @@ export function applySQLiteJsonBatch(
   }
 }
 
-export function readSQLiteJsonRows(
-  sql: SqlStorageLike,
-  query: ReadQuery,
-  collections: CollectionConfigs = {},
-): ReadResult {
-  ensureSQLiteJsonTables(sql, collections);
-
-  const collection = collections[query.collection];
-  if (!collection) {
-    if (Object.keys(collections).length > 0) {
-      throw new Error(`Unknown collection: ${query.collection}`);
-    }
-
-    throw new Error(`Cannot read unconfigured collection: ${query.collection}`);
-  }
-
-  if (collection.storage?.kind !== "sqlite-json") {
-    throw new Error(`Collection is not readable with SQLite JSON storage: ${query.collection}`);
-  }
-
-  const table = tableName(query.collection, collection.storage);
-  const filters = query.filters ?? [];
-  const bindings: Array<unknown> = [];
-  const where = filters.map((filter) => filterSql(filter, bindings));
-  const limit = query.limit ?? 1000;
-  const offset = query.offset ?? 0;
-
-  bindings.push(limit, offset);
-
-  const rows = sql
-    .exec<{ value: string }>(
-      `
-        SELECT value FROM ${quoteIdentifier(table)}
-        ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
-        ORDER BY key
-        LIMIT ? OFFSET ?
-      `,
-      ...bindings,
-    )
-    .toArray();
-
-  return {
-    rows: rows.map((row) => JSON.parse(row.value)),
-  };
-}
-
 function tableName(collectionName: string, storage: SQLiteJsonStorageConfig): string {
   return storage.tableName ?? collectionName;
 }
@@ -197,36 +150,6 @@ function jsonPath(field: string): string {
   }
 
   return field;
-}
-
-function filterSql(filter: ReadFilter, bindings: Array<unknown>): string {
-  const field = `json_extract(value, '$.${jsonPath(filter.field)}')`;
-
-  if (filter.op === "in") {
-    if (!Array.isArray(filter.value) || filter.value.length === 0) {
-      throw new Error("The in filter requires a non-empty array value");
-    }
-
-    bindings.push(...filter.value);
-    return `${field} IN (${filter.value.map(() => "?").join(", ")})`;
-  }
-
-  bindings.push(filter.value);
-
-  switch (filter.op) {
-    case "eq":
-      return `${field} = ?`;
-    case "ne":
-      return `${field} != ?`;
-    case "gt":
-      return `${field} > ?`;
-    case "gte":
-      return `${field} >= ?`;
-    case "lt":
-      return `${field} < ?`;
-    case "lte":
-      return `${field} <= ?`;
-  }
 }
 
 function stringifyRow(value: unknown): string {

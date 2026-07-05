@@ -1,10 +1,13 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { BaseCollectionConfig } from "@tanstack/db";
 import type {
   Batch as TransportBatch,
   Broadcast as TransportBroadcast,
   PushResult as TransportPushResult,
   ReadFilterInput,
   ReadFilterOperator as TransportReadFilterOperator,
+  ReadPredicate,
+  ReadOrderByInput,
   ReadQueryInput,
   ReadResult as TransportReadResult,
   Update as TransportUpdate,
@@ -16,6 +19,8 @@ export type Broadcast = TransportBroadcast;
 export type PushResult = TransportPushResult;
 export type ReadFilterOperator = TransportReadFilterOperator;
 export type ReadFilter = ReadFilterInput;
+export type { ReadPredicate };
+export type ReadOrderBy = ReadOrderByInput;
 export type ReadQuery = ReadQueryInput;
 export type ReadResult<T = unknown> = TransportReadResult<T>;
 
@@ -31,6 +36,9 @@ export interface CollectionOptions<
   TSchema extends StandardSchemaV1 = never,
 > {
   id?: string;
+  gcTime?: BaseCollectionConfig<T, TKey, TSchema>["gcTime"];
+  startSync?: BaseCollectionConfig<T, TKey, TSchema>["startSync"];
+  syncMode?: BaseCollectionConfig<T, TKey, TSchema>["syncMode"];
   collection: string;
   url: string | URL;
   clientId?: string;

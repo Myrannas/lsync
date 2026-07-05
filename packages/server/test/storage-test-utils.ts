@@ -47,19 +47,33 @@ export class FakeSql implements SqlStorageLike {
       return new FakeCursor(row ? ([{ value: row.value }] as unknown as Array<T>) : []);
     }
 
-    if (normalized.startsWith('SELECT value FROM "todos"')) {
-      let rows = [...this.rows.values()];
+    if (normalized.startsWith('SELECT key, value FROM "todos" WHERE key = ?')) {
+      const row = this.rows.get(String(bindings[0]));
+      return new FakeCursor(
+        row ? ([{ key: String(bindings[0]), value: row.value }] as unknown as Array<T>) : [],
+      );
+    }
 
-      if (normalized.includes("json_extract(value, '$.completed') = ?")) {
-        rows = rows.filter((row) => JSON.parse(row.value).completed === bindings[0]);
+    if (normalized.startsWith('SELECT key, value FROM "todos"')) {
+      let rows = [...this.rows.entries()];
+
+      const completedPathIndex = bindings.indexOf("$.completed");
+      if (normalized.includes("json_extract(value, ?) = ?") && completedPathIndex >= 0) {
+        rows = rows.filter(
+          ([, row]) =>
+            sqliteJsonValue(JSON.parse(row.value).completed) === bindings[completedPathIndex + 1],
+        );
       }
 
-      if (normalized.includes("json_extract(value, '$.text') IN (?, ?)")) {
-        const accepted = new Set(bindings.slice(0, 2));
-        rows = rows.filter((row) => accepted.has(JSON.parse(row.value).text));
+      const textPathIndex = bindings.indexOf("$.text");
+      if (normalized.includes("json_extract(value, ?) IN (?, ?)") && textPathIndex >= 0) {
+        const accepted = new Set(bindings.slice(textPathIndex + 1, textPathIndex + 3));
+        rows = rows.filter(([, row]) => accepted.has(JSON.parse(row.value).text));
       }
 
-      return new FakeCursor(rows.map((row) => ({ value: row.value })) as unknown as Array<T>);
+      return new FakeCursor(
+        rows.map(([key, row]) => ({ key, value: row.value })) as unknown as Array<T>,
+      );
     }
 
     if (normalized.startsWith('INSERT INTO "todos"')) {
@@ -99,4 +113,12 @@ export class FakeSql implements SqlStorageLike {
 
 export function batch(update: Batch["updates"][number]): Batch {
   return { updates: [update] };
+}
+
+function sqliteJsonValue(value: unknown): unknown {
+  if (typeof value === "boolean") {
+    return value ? 1 : 0;
+  }
+
+  return value;
 }

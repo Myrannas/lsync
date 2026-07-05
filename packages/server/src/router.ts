@@ -26,8 +26,28 @@ export const router = t.router({
     return { accepted: input.updates.length };
   }),
   read: t.procedure.input(readQuerySchema).query(({ ctx, input }): ReadResult => {
-    return ctx.read(input);
+    return ctx.read(normalizeReadQuery(input));
   }),
 });
 
 export type Router = typeof router;
+
+function normalizeReadQuery(input: {
+  collection: string;
+  filters?: ReadQuery["filters"] | undefined;
+  predicate?: ReadQuery["predicate"] | undefined;
+  orderBy?: ReadQuery["orderBy"] | undefined;
+  cursor?: ReadQuery["cursor"] | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
+}): ReadQuery {
+  return {
+    collection: input.collection,
+    ...(input.filters ? { filters: input.filters } : {}),
+    ...(input.predicate ? { predicate: input.predicate } : {}),
+    ...(input.orderBy ? { orderBy: input.orderBy } : {}),
+    ...(input.cursor ? { cursor: input.cursor } : {}),
+    ...(input.limit !== undefined ? { limit: input.limit } : {}),
+    ...(input.offset !== undefined ? { offset: input.offset } : {}),
+  };
+}

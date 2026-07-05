@@ -4,6 +4,9 @@
     "composite": true,
     "jsx": "react-jsx",
     "noEmit": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "types": ["vite/client"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

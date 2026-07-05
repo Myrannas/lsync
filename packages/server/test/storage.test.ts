@@ -167,8 +167,8 @@ describe("sqliteJsonTable", () => {
 
     expect(result.rows).toEqual([{ id: "1", text: "Done", completed: true }]);
     const statement = sql.statements.at(-1)!;
-    expect(statement.query).toContain("json_extract(value, '$.completed') = ?");
-    expect(statement.bindings).toEqual([true, 10, 0]);
+    expect(statement.query).toContain("json_extract(value, ?) = ?");
+    expect(statement.bindings).toEqual(["$.completed", 1, 10, 0]);
   });
 
   it("supports in filters for indexed JSON fields", () => {
@@ -220,21 +220,80 @@ describe("sqliteJsonTable", () => {
       { id: "1", text: "Alpha", completed: true },
       { id: "3", text: "Gamma", completed: false },
     ]);
-    expect(sql.statements.at(-1)!.bindings).toEqual(["Alpha", "Gamma", 1000, 0]);
+    expect(sql.statements.at(-1)!.bindings).toEqual(["$.text", "Alpha", "Gamma", 1000, 0]);
+  });
+
+  it("orders reads by configured JSON fields", () => {
+    const sql = new FakeSql();
+
+    readSQLiteJsonRows(
+      sql,
+      {
+        collection: "todos",
+        orderBy: [{ field: "text", direction: "desc" }],
+      },
+      collections,
+    );
+
+    expect(sql.statements.at(-1)!.query).toContain("ORDER BY json_extract(value, ?) DESC");
+    expect(sql.statements.at(-1)!.bindings).toEqual(["$.text", 1000, 0]);
+  });
+
+  it("reads cursor predicates as current and from windows", () => {
+    const sql = new FakeSql();
+
+    readSQLiteJsonRows(
+      sql,
+      {
+        collection: "todos",
+        orderBy: [{ field: "text", direction: "asc" }],
+        cursor: {
+          whereCurrent: { type: "comparison", field: "text", op: "eq", value: "Beta" },
+          whereFrom: {
+            type: "or",
+            predicates: [
+              { type: "comparison", field: "text", op: "gt", value: "Beta" },
+              {
+                type: "and",
+                predicates: [
+                  { type: "comparison", field: "text", op: "eq", value: "Beta" },
+                  { type: "comparison", field: "id", op: "gt", value: "2" },
+                ],
+              },
+            ],
+          },
+        },
+        limit: 5,
+      },
+      collections,
+    );
+
+    const currentQuery = sql.statements.at(-2)!;
+    const fromQuery = sql.statements.at(-1)!;
+    expect(currentQuery.query).toContain("json_extract(value, ?) = ?");
+    expect(fromQuery.query).toContain(
+      "(json_extract(value, ?) > ? OR (json_extract(value, ?) = ? AND json_extract(value, ?) > ?))",
+    );
+    expect(fromQuery.bindings).toEqual([
+      "$.text",
+      "Beta",
+      "$.text",
+      "Beta",
+      "$.id",
+      "2",
+      "$.text",
+      5,
+      0,
+    ]);
   });
 
   it("rejects invalid filter paths", () => {
     const sql = new FakeSql();
+    const query = {
+      collection: "todos",
+      filters: [{ field: "completed') = true --", op: "eq", value: true }],
+    } as const;
 
-    expect(() =>
-      readSQLiteJsonRows(
-        sql,
-        {
-          collection: "todos",
-          filters: [{ field: "completed') = true --", op: "eq", value: true }],
-        },
-        collections,
-      ),
-    ).toThrow("Invalid JSON index field");
+    expect(() => readSQLiteJsonRows(sql, query, collections)).toThrow("Invalid JSON index field");
   });
 });

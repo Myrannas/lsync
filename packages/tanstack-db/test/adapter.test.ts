@@ -54,6 +54,21 @@ describe("collectionOptions", () => {
     expect(options.getKey({ id: "1", text: "A", completed: false })).toBe("1");
     expect(options.sync.rowUpdateMode).toBe("partial");
   });
+
+  it("passes through on-demand sync mode", () => {
+    const options = collectionOptions({
+      id: "todos",
+      collection: "todos",
+      url: "ws://localhost:8787/sync/demo",
+      getKey: (todo: Todo) => todo.id,
+      schema: todoSchema,
+      syncMode: "on-demand",
+      startSync: true,
+    });
+
+    expect(options.syncMode).toBe("on-demand");
+    expect(options.startSync).toBe(true);
+  });
 });
 
 describe("createBatch", () => {
@@ -75,14 +90,21 @@ describe("createBatch", () => {
     });
   });
 
-  it("serializes update mutations as partial values", () => {
-    const result = createBatch("todos", "client-1", transaction({ type: "update" }));
+  it("serializes update mutations as full row values", () => {
+    const result = createBatch(
+      "todos",
+      "client-1",
+      transaction({
+        type: "update",
+        modified: { id: "1", text: "Write better tests", completed: false },
+      }),
+    );
 
     expect(result.updates[0]).toMatchObject({
       collection: "todos",
       key: "1",
       type: "update",
-      value: { text: "Write better tests" },
+      value: { id: "1", text: "Write better tests", completed: false },
       previousValue: {},
     });
   });
