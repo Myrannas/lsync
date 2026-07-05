@@ -1,13 +1,17 @@
+import {
+  parseLfsyncClientRpcRequest,
+  readLfsyncRpcId,
+  sendLfsyncServerMessage,
+  type LfsyncRpcId,
+} from "@lfsync/transport";
 import { lfsyncRouter } from "./router";
 import {
-  lfsyncBatchSchema,
-  lfsyncReadQuerySchema,
   type LfsyncBatch,
   type LfsyncBroadcast,
   type LfsyncCollectionConfigs,
   type LfsyncReadQuery,
   type LfsyncReadResult,
-  type LfsyncWebSocketAttachment
+  type LfsyncWebSocketAttachment,
 } from "./types";
 import { applySQLiteJsonBatch, readSQLiteJsonRows } from "./storage";
 import { validateLfsyncBatch } from "./validation";
@@ -20,22 +24,11 @@ export interface LfsyncDurableObjectOptions {
   collections?: LfsyncCollectionConfigs;
 }
 
-interface RpcRequest {
-  id?: string | number | null;
-  method?: "mutation" | "query";
-  params?: {
-    path?: string;
-    input?: {
-      json?: unknown;
-    };
-  };
-}
-
 export class LfsyncDurableObject implements DurableObject {
   constructor(
     private readonly state: DurableObjectState,
     private readonly env: LfsyncEnv,
-    private readonly options: LfsyncDurableObjectOptions = {}
+    private readonly options: LfsyncDurableObjectOptions = {},
   ) {}
 
   async fetch(request: Request): Promise<Response> {
@@ -53,12 +46,12 @@ export class LfsyncDurableObject implements DurableObject {
     this.state.acceptWebSocket(server);
     server.serializeAttachment({
       clientId,
-      connectedAt: Date.now()
+      connectedAt: Date.now(),
     } satisfies LfsyncWebSocketAttachment);
 
     return new Response(null, {
       status: 101,
-      webSocket: client
+      webSocket: client,
     });
   }
 
@@ -66,32 +59,23 @@ export class LfsyncDurableObject implements DurableObject {
     const text = typeof message === "string" ? message : new TextDecoder().decode(message);
 
     try {
-      const request = JSON.parse(text) as RpcRequest;
-
-      if (
-        !(
-          (request.method === "mutation" && request.params?.path === "push") ||
-          (request.method === "query" && request.params?.path === "read")
-        )
-      ) {
-        throw new Error("Unsupported tRPC operation");
-      }
+      const request = parseLfsyncClientRpcRequest(text);
 
       const caller = lfsyncRouter.createCaller({
         roomId: this.roomId(),
         validate: (input) => this.validate(input),
         persist: (input) => this.persist(input),
         publish: (input) => this.publish(input),
-        read: (input) => this.read(input)
+        read: (input) => this.read(input),
       });
 
       const result =
         request.method === "mutation"
-          ? await caller.push(lfsyncBatchSchema.parse(request.params.input?.json))
-          : await caller.read(lfsyncReadQuerySchema.parse(request.params.input?.json));
+          ? await caller.push(request.params.input.json)
+          : await caller.read(request.params.input.json);
       this.sendRpcResult(ws, request.id, result);
     } catch (error) {
-      this.sendRpcError(ws, this.tryReadRequestId(text), error);
+      this.sendRpcError(ws, readLfsyncRpcId(text), error);
     }
   }
 
@@ -107,21 +91,21 @@ export class LfsyncDurableObject implements DurableObject {
     const payload: LfsyncBroadcast = {
       type: "updates",
       roomId: this.roomId(),
-      updates: batch.updates
+      updates: batch.updates,
     };
 
-    const encoded = JSON.stringify({
+    const message = {
       method: "subscription",
       params: {
         path: "updates",
         input: {
-          json: payload
-        }
-      }
-    });
+          json: payload,
+        },
+      },
+    } as const;
 
     for (const socket of this.state.getWebSockets()) {
-      socket.send(encoded);
+      sendLfsyncServerMessage(socket, message);
     }
   }
 
@@ -141,44 +125,31 @@ export class LfsyncDurableObject implements DurableObject {
     return this.state.id.toString();
   }
 
-  private sendRpcResult(ws: WebSocket, id: RpcRequest["id"], result: unknown): void {
-    ws.send(
-      JSON.stringify({
-        id,
-        result: {
-          type: "data",
-          data: {
-            json: result
-          }
-        }
-      })
-    );
+  private sendRpcResult(ws: WebSocket, id: LfsyncRpcId, result: unknown): void {
+    sendLfsyncServerMessage(ws, {
+      id,
+      result: {
+        type: "data",
+        data: {
+          json: result,
+        },
+      },
+    });
   }
 
-  private sendRpcError(ws: WebSocket, id: RpcRequest["id"], error: unknown): void {
+  private sendRpcError(ws: WebSocket, id: LfsyncRpcId, error: unknown): void {
     const message = error instanceof Error ? error.message : "Unknown error";
-    ws.send(
-      JSON.stringify({
-        id,
-        error: {
-          message
-        }
-      })
-    );
-  }
-
-  private tryReadRequestId(text: string): RpcRequest["id"] {
-    try {
-      const request = JSON.parse(text) as RpcRequest;
-      return request.id;
-    } catch {
-      return null;
-    }
+    sendLfsyncServerMessage(ws, {
+      id,
+      error: {
+        message,
+      },
+    });
   }
 }
 
 export function createLfsyncDurableObject(
-  options: LfsyncDurableObjectOptions
+  options: LfsyncDurableObjectOptions,
 ): typeof LfsyncDurableObject {
   return class ConfiguredLfsyncDurableObject extends LfsyncDurableObject {
     constructor(state: DurableObjectState, env: LfsyncEnv) {
@@ -213,6 +184,6 @@ export function createLfsyncWorkerHandler(options: LfsyncWorkerOptions = {}) {
       const id = namespace.idFromName(decodeURIComponent(match[1]));
       const stub = namespace.get(id);
       return stub.fetch(request);
-    }
+    },
   };
 }

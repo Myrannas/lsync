@@ -1,10 +1,14 @@
-import { createLfsyncDurableObject, createLfsyncWorkerHandler, sqliteJsonTable } from "@lfsync/server";
+import {
+  createLfsyncDurableObject,
+  createLfsyncWorkerHandler,
+  sqliteJsonTable,
+} from "@lfsync/server";
 import { z } from "zod";
 
 const todoSchema = z.object({
   id: z.string(),
   text: z.string(),
-  completed: z.boolean()
+  completed: z.boolean(),
 });
 
 const LfsyncRoomBase = createLfsyncDurableObject({
@@ -12,10 +16,10 @@ const LfsyncRoomBase = createLfsyncDurableObject({
     todos: {
       schema: todoSchema,
       storage: sqliteJsonTable({
-        indexes: [["completed"]]
-      })
-    }
-  }
+        indexes: [["completed"]],
+      }),
+    },
+  },
 });
 
 export class LfsyncRoom extends LfsyncRoomBase {}

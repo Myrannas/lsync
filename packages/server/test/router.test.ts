@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { lfsyncRouter } from "../src/router";
 import type { LfsyncBatch } from "../src/types";
 
@@ -10,9 +10,9 @@ const batch: LfsyncBatch = {
       key: "1",
       type: "insert",
       value: { id: "1", text: "Persist first", completed: false },
-      createdAt: 1
-    }
-  ]
+      createdAt: 1,
+    },
+  ],
 };
 
 describe("lfsyncRouter", () => {
@@ -23,7 +23,7 @@ describe("lfsyncRouter", () => {
       validate: () => calls.push("validate"),
       persist: () => calls.push("persist"),
       publish: () => calls.push("publish"),
-      read: () => ({ rows: [] })
+      read: () => ({ rows: [] }),
     });
 
     await expect(caller.push(batch)).resolves.toEqual({ accepted: 1 });
@@ -37,17 +37,17 @@ describe("lfsyncRouter", () => {
       persist: () => undefined,
       publish: () => undefined,
       read: (query) => ({
-        rows: [{ id: "1", collection: query.collection }]
-      })
+        rows: [{ id: "1", collection: query.collection }],
+      }),
     });
 
     await expect(
       caller.read({
         collection: "todos",
-        filters: [{ field: "completed", op: "eq", value: false }]
-      })
+        filters: [{ field: "completed", op: "eq", value: false }],
+      }),
     ).resolves.toEqual({
-      rows: [{ id: "1", collection: "todos" }]
+      rows: [{ id: "1", collection: "todos" }],
     });
   });
 });

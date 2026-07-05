@@ -10,5 +10,5 @@ export type {
   LfsyncReadFilterOperator,
   LfsyncReadQuery,
   LfsyncReadResult,
-  LfsyncUpdate
+  LfsyncUpdate,
 } from "./types";

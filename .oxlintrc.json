@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "eslint/max-lines": [
+      "error",
+      {
+        "max": 300
+      }
+    ]
+  }
+}

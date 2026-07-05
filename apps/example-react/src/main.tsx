@@ -1,7 +1,7 @@
 import { createCollection } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
-import { lfsyncCollectionOptions } from "@lfsync/tanstack-db";
-import React, { useMemo, useState } from "react";
+import { collectionOptions } from "@lfsync/tanstack-db";
+import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { z } from "zod";
 import "./styles.css";
@@ -9,7 +9,7 @@ import "./styles.css";
 const todoSchema = z.object({
   id: z.string(),
   text: z.string(),
-  completed: z.boolean()
+  completed: z.boolean(),
 });
 
 type Todo = z.infer<typeof todoSchema>;
@@ -19,21 +19,19 @@ const workerUrl = import.meta.env.VITE_LFSYNC_URL ?? "ws://localhost:8787";
 const syncUrl = `${workerUrl.replace(/\/$/, "")}/sync/${encodeURIComponent(roomId)}`;
 
 const todos = createCollection(
-  lfsyncCollectionOptions<Todo, string>({
+  collectionOptions({
     id: "todos",
     collection: "todos",
     url: syncUrl,
-    getKey: (todo) => todo.id,
-    schema: todoSchema
-  })
+    getKey: (todo: Todo) => todo.id,
+    schema: todoSchema,
+  }),
 );
 
 function App() {
   const [text, setText] = useState("");
-  const { data = [] } = useLiveQuery((query) => query.from({ todo: todos }));
-  const sortedTodos = useMemo(
-    () => [...data].sort((a, b) => a.text.localeCompare(b.text)),
-    [data]
+  const { data } = useLiveQuery((query) =>
+    query.from({ todo: todos }).orderBy((row) => row.todo.text),
   );
 
   return (
@@ -51,7 +49,7 @@ function App() {
             todos.insert({
               id: crypto.randomUUID(),
               text: trimmed,
-              completed: false
+              completed: false,
             });
             setText("");
           }}
@@ -66,7 +64,7 @@ function App() {
       </section>
 
       <ul>
-        {sortedTodos.map((todo) => (
+        {data.map((todo) => (
           <li key={todo.id}>
             <label>
               <input
@@ -93,5 +91,5 @@ function App() {
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

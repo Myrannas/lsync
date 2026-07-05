@@ -5,7 +5,7 @@ import type {
   LfsyncReadQuery,
   LfsyncReadResult,
   LfsyncSQLiteJsonIndexConfig,
-  LfsyncSQLiteJsonStorageConfig
+  LfsyncSQLiteJsonStorageConfig,
 } from "./types";
 
 export type SqlStorageValue = ArrayBuffer | string | number | null;
@@ -26,19 +26,21 @@ export interface SQLiteJsonTableOptions {
   indexes?: Array<Array<string> | LfsyncSQLiteJsonIndexConfig>;
 }
 
-export function sqliteJsonTable(options: SQLiteJsonTableOptions = {}): LfsyncSQLiteJsonStorageConfig {
+export function sqliteJsonTable(
+  options: SQLiteJsonTableOptions = {},
+): LfsyncSQLiteJsonStorageConfig {
   return {
     kind: "sqlite-json",
     ...(options.tableName ? { tableName: options.tableName } : {}),
     indexes: (options.indexes ?? []).map((index) =>
-      Array.isArray(index) ? { fields: index } : index
-    )
+      Array.isArray(index) ? { fields: index } : index,
+    ),
   };
 }
 
 export function ensureSQLiteJsonTables(
   sql: SqlStorageLike,
-  collections: LfsyncCollectionConfigs = {}
+  collections: LfsyncCollectionConfigs = {},
 ): void {
   for (const [collectionName, collection] of Object.entries(collections)) {
     if (collection.storage?.kind !== "sqlite-json") {
@@ -66,7 +68,7 @@ export function ensureSQLiteJsonTables(
 export function applySQLiteJsonBatch(
   sql: SqlStorageLike,
   batch: LfsyncBatch,
-  collections: LfsyncCollectionConfigs = {}
+  collections: LfsyncCollectionConfigs = {},
 ): void {
   ensureSQLiteJsonTables(sql, collections);
 
@@ -100,7 +102,7 @@ export function applySQLiteJsonBatch(
         update.path ?? "",
         stringifyRow(update.value),
         updatedAt,
-        updatedAt
+        updatedAt,
       );
       continue;
     }
@@ -122,7 +124,7 @@ export function applySQLiteJsonBatch(
       `,
       JSON.stringify(merged),
       updatedAt,
-      key
+      key,
     );
   }
 }
@@ -130,7 +132,7 @@ export function applySQLiteJsonBatch(
 export function readSQLiteJsonRows(
   sql: SqlStorageLike,
   query: LfsyncReadQuery,
-  collections: LfsyncCollectionConfigs = {}
+  collections: LfsyncCollectionConfigs = {},
 ): LfsyncReadResult {
   ensureSQLiteJsonTables(sql, collections);
 
@@ -164,12 +166,12 @@ export function readSQLiteJsonRows(
         ORDER BY key
         LIMIT ? OFFSET ?
       `,
-      ...bindings
+      ...bindings,
     )
     .toArray();
 
   return {
-    rows: rows.map((row) => JSON.parse(row.value))
+    rows: rows.map((row) => JSON.parse(row.value)),
   };
 }
 
@@ -244,7 +246,7 @@ function mergeRows(existing: unknown, changes: unknown): Record<string, unknown>
 
   return {
     ...existing,
-    ...changes
+    ...changes,
   };
 }
 

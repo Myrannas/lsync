@@ -2,3 +2,20 @@ packages:
   - "packages/*"
   - "apps/*"
 
+catalog:
+  "@standard-schema/spec": ^1.0.0
+  "@tanstack/db": ^0.6.14
+  "@tanstack/react-db": ^0.1.92
+  "@trpc/client": ^11.4.4
+  typescript: ^6.0.3
+  zod: ^4.4.3
+  "@trpc/server": ^11.4.4
+  "@cloudflare/workers-types": ^5.20260705.1
+  wrangler: ^4.107.0
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.2
+  vite-plus: 0.2.2
+  "@vitejs/plugin-react": ^4.7.0
+  react: ^19.1.1
+  react-dom: ^19.1.1
+  "@types/react": ^19.1.8
+  "@types/react-dom": ^19.1.6

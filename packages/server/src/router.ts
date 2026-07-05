@@ -5,7 +5,7 @@ import {
   type LfsyncBatch,
   type LfsyncPushResult,
   type LfsyncReadQuery,
-  type LfsyncReadResult
+  type LfsyncReadResult,
 } from "./types";
 
 export interface LfsyncContext {
@@ -27,7 +27,7 @@ export const lfsyncRouter = t.router({
   }),
   read: t.procedure.input(lfsyncReadQuerySchema).query(({ ctx, input }): LfsyncReadResult => {
     return ctx.read(input);
-  })
+  }),
 });
 
 export type LfsyncRouter = typeof lfsyncRouter;

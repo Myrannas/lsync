@@ -20,7 +20,7 @@ Auth is intentionally left out for now.
 ## Packages
 
 - `@lfsync/server` exports the reusable Durable Object class, worker fetch handler, tRPC router, and shared wire types.
-- `@lfsync/tanstack-db` exports `lfsyncCollectionOptions`, a TanStack DB collection adapter.
+- `@lfsync/tanstack-db` exports `collectionOptions`, a TanStack DB collection adapter.
 - `@lfsync/example-worker` is a minimal Cloudflare Worker using the reusable server package.
 - `@lfsync/example-react` is a Vite app with a shared todo collection.
 
@@ -55,13 +55,17 @@ Set `VITE_LFSYNC_URL` if the worker is not running on `ws://localhost:8787`.
 ## Example Worker
 
 ```ts
-import { createLfsyncDurableObject, createLfsyncWorkerHandler, sqliteJsonTable } from "@lfsync/server";
+import {
+  createLfsyncDurableObject,
+  createLfsyncWorkerHandler,
+  sqliteJsonTable,
+} from "@lfsync/server";
 import { z } from "zod";
 
 const todoSchema = z.object({
   id: z.string(),
   text: z.string(),
-  completed: z.boolean()
+  completed: z.boolean(),
 });
 
 const LfsyncRoomBase = createLfsyncDurableObject({
@@ -69,10 +73,10 @@ const LfsyncRoomBase = createLfsyncDurableObject({
     todos: {
       schema: todoSchema,
       storage: sqliteJsonTable({
-        indexes: [["completed"]]
-      })
-    }
-  }
+        indexes: [["completed"]],
+      }),
+    },
+  },
 });
 
 export class LfsyncRoom extends LfsyncRoomBase {}
@@ -84,10 +88,10 @@ export default createLfsyncWorkerHandler();
 
 ```ts
 import { createCollection } from "@tanstack/db";
-import { lfsyncCollectionOptions } from "@lfsync/tanstack-db";
+import { collectionOptions } from "@lfsync/tanstack-db";
 
 const todos = createCollection(
-  lfsyncCollectionOptions({
+  collectionOptions({
     id: "todos",
     collection: "todos",
     url: "ws://localhost:8787/sync/demo",
@@ -95,9 +99,9 @@ const todos = createCollection(
     schema: todoSchema,
     read: {
       filters: [{ field: "completed", op: "eq", value: false }],
-      limit: 100
-    }
-  })
+      limit: 100,
+    },
+  }),
 );
 ```
 

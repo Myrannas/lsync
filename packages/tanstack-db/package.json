@@ -9,20 +9,18 @@
       "import": "./dist/index.js"
     }
   },
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
-  },
+  "scripts": {},
   "dependencies": {
-    "@standard-schema/spec": "^1.0.0",
-    "@tanstack/db": "^0.6.14",
-    "@trpc/client": "^11.4.4",
-    "@trpc/server": "^11.4.4"
+    "@lfsync/transport": "workspace:*",
+    "@standard-schema/spec": "catalog:",
+    "@tanstack/db": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "zod": "^3.25.76"
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "zod": "catalog:"
   }
 }

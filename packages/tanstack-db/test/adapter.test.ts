@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { createLfsyncBatch, lfsyncCollectionOptions } from "../src/index";
+import { collectionOptions, createBatch } from "../src/index";
 import type { PendingMutation, TransactionWithMutations } from "@tanstack/db";
 
 interface Todo {
@@ -12,12 +12,12 @@ interface Todo {
 const todoSchema = z.object({
   id: z.string(),
   text: z.string(),
-  completed: z.boolean()
+  completed: z.boolean(),
 });
 
 function transaction(
-  mutation: Partial<PendingMutation<Todo>> & Pick<PendingMutation<Todo>, "type">
-): TransactionWithMutations<Todo> {
+  mutation: Partial<PendingMutation<Todo>> & Pick<PendingMutation<Todo>, "type">,
+): Pick<TransactionWithMutations<Todo>, "mutations"> {
   return {
     mutations: [
       {
@@ -33,20 +33,20 @@ function transaction(
         createdAt: new Date(1000),
         updatedAt: new Date(1000),
         collection: {} as PendingMutation<Todo>["collection"],
-        ...mutation
-      } as PendingMutation<Todo>
-    ]
-  } as TransactionWithMutations<Todo>;
+        ...mutation,
+      } as PendingMutation<Todo>,
+    ],
+  };
 }
 
-describe("lfsyncCollectionOptions", () => {
+describe("collectionOptions", () => {
   it("includes schema and collection identity in the TanStack config", () => {
-    const options = lfsyncCollectionOptions<Todo, string>({
+    const options = collectionOptions({
       id: "todos",
       collection: "todos",
       url: "ws://localhost:8787/sync/demo",
-      getKey: (todo) => todo.id,
-      schema: todoSchema
+      getKey: (todo: Todo) => todo.id,
+      schema: todoSchema,
     });
 
     expect(options.id).toBe("todos");
@@ -56,9 +56,9 @@ describe("lfsyncCollectionOptions", () => {
   });
 });
 
-describe("createLfsyncBatch", () => {
+describe("createBatch", () => {
   it("serializes insert mutations as full row values", () => {
-    const result = createLfsyncBatch("todos", "client-1", transaction({ type: "insert" }));
+    const result = createBatch("todos", "client-1", transaction({ type: "insert" }));
 
     expect(result).toEqual({
       updates: [
@@ -69,41 +69,40 @@ describe("createLfsyncBatch", () => {
           type: "insert",
           value: { id: "1", text: "Write tests", completed: false },
           clientId: "client-1",
-          createdAt: 1000
-        }
-      ]
+          createdAt: 1000,
+        },
+      ],
     });
   });
 
   it("serializes update mutations as partial values", () => {
-    const result = createLfsyncBatch("todos", "client-1", transaction({ type: "update" }));
+    const result = createBatch("todos", "client-1", transaction({ type: "update" }));
 
     expect(result.updates[0]).toMatchObject({
       collection: "todos",
       key: "1",
       type: "update",
       value: { text: "Write better tests" },
-      previousValue: {}
+      previousValue: {},
     });
   });
 
   it("serializes delete mutations without a value", () => {
-    const result = createLfsyncBatch(
+    const result = createBatch(
       "todos",
       "client-1",
       transaction({
         type: "delete",
-        original: { id: "1", text: "Remove me", completed: false }
-      })
+        original: { id: "1", text: "Remove me", completed: false },
+      }),
     );
 
     expect(result.updates[0]).toMatchObject({
       collection: "todos",
       key: "1",
       type: "delete",
-      previousValue: { id: "1", text: "Remove me", completed: false }
+      previousValue: { id: "1", text: "Remove me", completed: false },
     });
     expect(result.updates[0]).not.toHaveProperty("value");
   });
 });
-

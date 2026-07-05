@@ -13,18 +13,16 @@
       "import": "./dist/client.js"
     }
   },
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
-  },
+  "scripts": {},
   "dependencies": {
-    "@trpc/server": "^11.4.4",
-    "zod": "^3.25.76"
+    "@lfsync/transport": "workspace:*",
+    "@trpc/server": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260704.1",
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "@cloudflare/workers-types": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 import { validateLfsyncBatch } from "../src/validation";
 import type { LfsyncBatch, LfsyncCollectionConfigs } from "../src/types";
@@ -6,18 +6,18 @@ import type { LfsyncBatch, LfsyncCollectionConfigs } from "../src/types";
 const todoSchema = z.object({
   id: z.string(),
   text: z.string(),
-  completed: z.boolean()
+  completed: z.boolean(),
 });
 
 const collections: LfsyncCollectionConfigs = {
   todos: {
-    schema: todoSchema
-  }
+    schema: todoSchema,
+  },
 };
 
 function batch(value: LfsyncBatch["updates"][number]): LfsyncBatch {
   return {
-    updates: [value]
+    updates: [value],
   };
 }
 
@@ -31,10 +31,10 @@ describe("validateLfsyncBatch", () => {
           key: "1",
           type: "insert",
           value: { id: "1", text: "Ship it", completed: false },
-          createdAt: 1
+          createdAt: 1,
         }),
-        collections
-      )
+        collections,
+      ),
     ).not.toThrow();
   });
 
@@ -47,10 +47,10 @@ describe("validateLfsyncBatch", () => {
           key: "1",
           type: "update",
           value: { completed: true },
-          createdAt: 2
+          createdAt: 2,
         }),
-        collections
-      )
+        collections,
+      ),
     ).not.toThrow();
   });
 
@@ -63,15 +63,17 @@ describe("validateLfsyncBatch", () => {
           key: "1",
           type: "insert",
           value: { id: "1", body: "Nope" },
-          createdAt: 3
+          createdAt: 3,
         }),
-        collections
-      )
+        collections,
+      ),
     ).toThrow("Unknown lfsync collection: notes");
   });
 
   it("rejects invalid insert payloads before publish", () => {
-    expect(() =>
+    let error: unknown;
+
+    try {
       validateLfsyncBatch(
         batch({
           id: "m4",
@@ -79,11 +81,15 @@ describe("validateLfsyncBatch", () => {
           key: "1",
           type: "insert",
           value: { id: "1", text: "Missing completed" },
-          createdAt: 4
+          createdAt: 4,
         }),
-        collections
-      )
-    ).toThrow("Required");
+        collections,
+      );
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(String(error)).toContain("completed");
   });
 
   it("skips schema parsing when no collection registry is configured", () => {
@@ -95,10 +101,9 @@ describe("validateLfsyncBatch", () => {
           key: "1",
           type: "insert",
           value: { any: "shape" },
-          createdAt: 5
-        })
-      )
+          createdAt: 5,
+        }),
+      ),
     ).not.toThrow();
   });
 });
-

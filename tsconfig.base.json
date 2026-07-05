@@ -13,11 +13,11 @@
     "isolatedModules": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "baseUrl": ".",
     "paths": {
-      "@lfsync/server": ["packages/server/src/index.ts"],
-      "@lfsync/server/client": ["packages/server/src/client.ts"],
-      "@lfsync/tanstack-db": ["packages/tanstack-db/src/index.ts"]
+      "@lfsync/server": ["./packages/server/src/index.ts"],
+      "@lfsync/server/client": ["./packages/server/src/client.ts"],
+      "@lfsync/tanstack-db": ["./packages/tanstack-db/src/index.ts"],
+      "@lfsync/transport": ["./packages/transport/src/index.ts"]
     }
   }
 }

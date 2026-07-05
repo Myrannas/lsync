@@ -4,24 +4,23 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "check": "tsc -p tsconfig.json --noEmit",
-    "dev": "vite --host 0.0.0.0"
+    "build": "vp build",
+    "dev": "vp dev --host 0.0.0.0"
   },
   "dependencies": {
     "@lfsync/tanstack-db": "workspace:*",
-    "@tanstack/db": "^0.6.14",
-    "@tanstack/react-db": "^0.1.92",
-    "@vitejs/plugin-react": "^4.7.0",
-    "vite": "^7.0.6",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "zod": "^3.25.76"
+    "@tanstack/db": "catalog:",
+    "@tanstack/react-db": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "vite": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "typescript": "^5.9.2"
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
   }
 }
-

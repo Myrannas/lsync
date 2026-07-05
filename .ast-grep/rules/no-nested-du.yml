@@ -1,0 +1,27 @@
+id: no-nested-du
+language: typescript
+rule:
+  any:
+    - pattern: z.$METHOD($$$ARGS)
+      inside:
+        kind: array
+        inside:
+          kind: arguments
+          inside:
+            pattern: z.discriminatedUnion($KEY, $$$REST)
+    - pattern: z.$METHOD($$$ARGS).$CHAIN($$$CHAIN_ARGS)
+      inside:
+        kind: array
+        inside:
+          kind: arguments
+          inside:
+            pattern: z.discriminatedUnion($KEY, $$$REST)
+labels:
+  METHOD:
+    style: primary
+    message: "Inline zod methods are not allowed in discriminated union options"
+message: Don't use inline zod methods in discriminated union options
+severity: error
+note: |
+  Nesting schemas within a discriminated union makes the code complicated.
+  Extract schemas into separate variables and use them in the discriminated union.

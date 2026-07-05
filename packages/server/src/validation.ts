@@ -3,7 +3,7 @@ import type { LfsyncBatch, LfsyncCollectionConfigs } from "./types";
 
 export function validateLfsyncBatch(
   batch: LfsyncBatch,
-  collections?: LfsyncCollectionConfigs
+  collections?: LfsyncCollectionConfigs,
 ): void {
   for (const update of batch.updates) {
     const schema = schemaFor(update.collection, collections);
@@ -23,7 +23,7 @@ export function validateLfsyncBatch(
 
 function schemaFor(
   collection: string,
-  collections?: LfsyncCollectionConfigs
+  collections?: LfsyncCollectionConfigs,
 ): z.ZodTypeAny | undefined {
   const configured = collections?.[collection];
 
@@ -37,4 +37,3 @@ function schemaFor(
 
   return configured.schema;
 }
-
