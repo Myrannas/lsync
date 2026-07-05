@@ -1,0 +1,19 @@
+{
+  "name": "lfsync",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "corepack pnpm -r build",
+    "check": "corepack pnpm -r check",
+    "test": "corepack pnpm -r test",
+    "dev:worker": "corepack pnpm --filter @lfsync/example-worker dev",
+    "dev:react": "corepack pnpm --filter @lfsync/example-react dev"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260704.1",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

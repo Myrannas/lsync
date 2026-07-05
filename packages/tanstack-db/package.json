@@ -1,0 +1,28 @@
+{
+  "name": "@lfsync/tanstack-db",
+  "version": "0.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "^1.0.0",
+    "@tanstack/db": "^0.6.14",
+    "@trpc/client": "^11.4.4",
+    "@trpc/server": "^11.4.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
+    "zod": "^3.25.76"
+  }
+}

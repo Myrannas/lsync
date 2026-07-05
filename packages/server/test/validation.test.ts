@@ -1,0 +1,104 @@
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+import { validateLfsyncBatch } from "../src/validation";
+import type { LfsyncBatch, LfsyncCollectionConfigs } from "../src/types";
+
+const todoSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  completed: z.boolean()
+});
+
+const collections: LfsyncCollectionConfigs = {
+  todos: {
+    schema: todoSchema
+  }
+};
+
+function batch(value: LfsyncBatch["updates"][number]): LfsyncBatch {
+  return {
+    updates: [value]
+  };
+}
+
+describe("validateLfsyncBatch", () => {
+  it("accepts inserts that match the configured collection schema", () => {
+    expect(() =>
+      validateLfsyncBatch(
+        batch({
+          id: "m1",
+          collection: "todos",
+          key: "1",
+          type: "insert",
+          value: { id: "1", text: "Ship it", completed: false },
+          createdAt: 1
+        }),
+        collections
+      )
+    ).not.toThrow();
+  });
+
+  it("accepts partial updates for object schemas", () => {
+    expect(() =>
+      validateLfsyncBatch(
+        batch({
+          id: "m2",
+          collection: "todos",
+          key: "1",
+          type: "update",
+          value: { completed: true },
+          createdAt: 2
+        }),
+        collections
+      )
+    ).not.toThrow();
+  });
+
+  it("rejects writes for unknown configured collections", () => {
+    expect(() =>
+      validateLfsyncBatch(
+        batch({
+          id: "m3",
+          collection: "notes",
+          key: "1",
+          type: "insert",
+          value: { id: "1", body: "Nope" },
+          createdAt: 3
+        }),
+        collections
+      )
+    ).toThrow("Unknown lfsync collection: notes");
+  });
+
+  it("rejects invalid insert payloads before publish", () => {
+    expect(() =>
+      validateLfsyncBatch(
+        batch({
+          id: "m4",
+          collection: "todos",
+          key: "1",
+          type: "insert",
+          value: { id: "1", text: "Missing completed" },
+          createdAt: 4
+        }),
+        collections
+      )
+    ).toThrow("Required");
+  });
+
+  it("skips schema parsing when no collection registry is configured", () => {
+    expect(() =>
+      validateLfsyncBatch(
+        batch({
+          id: "m5",
+          collection: "anything",
+          key: "1",
+          type: "insert",
+          value: { any: "shape" },
+          createdAt: 5
+        })
+      )
+    ).not.toThrow();
+  });
+});
+
