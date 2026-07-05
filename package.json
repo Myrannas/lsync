@@ -4,8 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "corepack pnpm -r build",
-    "test": "corepack pnpm -r test",
     "dev:worker": "corepack pnpm --filter @lfsync/example-worker dev",
     "dev:react": "corepack pnpm --filter @lfsync/example-react dev",
     "prepare": "vp config"

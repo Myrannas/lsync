@@ -31,7 +31,7 @@ jobs:
             vite-task-${{ runner.os }}-${{ runner.arch }}-
 
       - run: vp run check
-      - run: vp run test
+      - run: vp test
 
       - name: Save Vite Task cache
         if: success()
