@@ -4,10 +4,10 @@ import {
   type SqlStorageLike,
   type SqlStorageValue,
 } from "../src/storage";
-import type { LfsyncBatch, LfsyncCollectionConfigs } from "../src/types";
+import type { Batch, CollectionConfigs } from "../src/types";
 import { z } from "zod";
 
-export const collections: LfsyncCollectionConfigs = {
+export const collections: CollectionConfigs = {
   todos: {
     schema: z.object({
       id: z.string(),
@@ -97,6 +97,6 @@ export class FakeSql implements SqlStorageLike {
   }
 }
 
-export function batch(update: LfsyncBatch["updates"][number]): LfsyncBatch {
+export function batch(update: Batch["updates"][number]): Batch {
   return { updates: [update] };
 }

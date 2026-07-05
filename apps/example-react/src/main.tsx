@@ -14,9 +14,9 @@ const todoSchema = z.object({
 
 type Todo = z.infer<typeof todoSchema>;
 
-const roomId = new URLSearchParams(window.location.search).get("room") ?? "demo";
-const workerUrl = import.meta.env.VITE_LFSYNC_URL ?? "ws://localhost:8787";
-const syncUrl = `${workerUrl.replace(/\/$/, "")}/sync/${encodeURIComponent(roomId)}`;
+const shardId = new URLSearchParams(window.location.search).get("shard") ?? "demo";
+const workerUrl = import.meta.env.VITE_SYNC_URL ?? "ws://localhost:8787";
+const syncUrl = `${workerUrl.replace(/\/$/, "")}/sync/${encodeURIComponent(shardId)}`;
 
 const todos = createCollection(
   collectionOptions({
@@ -38,8 +38,8 @@ function App() {
     <main>
       <section className="toolbar">
         <div>
-          <h1>lfsync</h1>
-          <p>Room {roomId}</p>
+          <h1>Sync</h1>
+          <p>Shard {shardId}</p>
         </div>
         <form
           onSubmit={(event) => {

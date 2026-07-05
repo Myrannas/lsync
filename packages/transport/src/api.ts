@@ -1,69 +1,69 @@
 import { z } from "zod";
 
-export const lfsyncOperationTypeSchema = z.enum(["insert", "update", "delete"]);
+export const operationTypeSchema = z.enum(["insert", "update", "delete"]);
 
-export const lfsyncUpdateSchema = z.object({
+export const updateSchema = z.object({
   id: z.string(),
   collection: z.string(),
   path: z.string().optional(),
   key: z.union([z.string(), z.number()]),
-  type: lfsyncOperationTypeSchema,
+  type: operationTypeSchema,
   value: z.unknown().optional(),
   previousValue: z.unknown().optional(),
   clientId: z.string().optional(),
   createdAt: z.number(),
 });
 
-export const lfsyncBatchSchema = z.object({
-  updates: z.array(lfsyncUpdateSchema).min(1),
+export const batchSchema = z.object({
+  updates: z.array(updateSchema).min(1),
 });
 
-export const lfsyncReadFilterOperatorSchema = z.enum(["eq", "ne", "gt", "gte", "lt", "lte", "in"]);
+export const readFilterOperatorSchema = z.enum(["eq", "ne", "gt", "gte", "lt", "lte", "in"]);
 
-export const lfsyncReadFilterSchema = z.object({
+export const readFilterSchema = z.object({
   field: z.string().min(1),
-  op: lfsyncReadFilterOperatorSchema.default("eq"),
+  op: readFilterOperatorSchema.default("eq"),
   value: z.unknown(),
 });
 
-export const lfsyncReadQuerySchema = z.object({
+export const readQuerySchema = z.object({
   collection: z.string(),
-  filters: z.array(lfsyncReadFilterSchema).optional(),
+  filters: z.array(readFilterSchema).optional(),
   limit: z.number().int().positive().max(1000).optional(),
   offset: z.number().int().nonnegative().optional(),
 });
 
-export const lfsyncReadResultSchema = z.object({
+export const readResultSchema = z.object({
   rows: z.array(z.unknown()),
 });
 
-export const lfsyncPushResultSchema = z.object({
+export const pushResultSchema = z.object({
   accepted: z.number().int().nonnegative(),
 });
 
-export const lfsyncBroadcastSchema = z.object({
+export const broadcastSchema = z.object({
   type: z.literal("updates"),
-  roomId: z.string(),
-  updates: z.array(lfsyncUpdateSchema),
+  shardId: z.string(),
+  updates: z.array(updateSchema),
 });
 
-export const lfsyncWebSocketAttachmentSchema = z.object({
+export const webSocketAttachmentSchema = z.object({
   clientId: z.string(),
   connectedAt: z.number(),
 });
 
-export type LfsyncOperationType = z.infer<typeof lfsyncOperationTypeSchema>;
-export type LfsyncUpdate = z.infer<typeof lfsyncUpdateSchema>;
-export type LfsyncBatch = z.infer<typeof lfsyncBatchSchema>;
-export type LfsyncReadFilterOperator = z.infer<typeof lfsyncReadFilterOperatorSchema>;
-export type LfsyncReadFilter = z.output<typeof lfsyncReadFilterSchema>;
-export type LfsyncReadFilterInput = z.input<typeof lfsyncReadFilterSchema>;
-export type LfsyncReadQuery = z.output<typeof lfsyncReadQuerySchema>;
-export type LfsyncReadQueryInput = z.input<typeof lfsyncReadQuerySchema>;
-export type LfsyncPushResult = z.infer<typeof lfsyncPushResultSchema>;
-export type LfsyncBroadcast = z.infer<typeof lfsyncBroadcastSchema>;
-export type LfsyncWebSocketAttachment = z.infer<typeof lfsyncWebSocketAttachmentSchema>;
+export type OperationType = z.infer<typeof operationTypeSchema>;
+export type Update = z.infer<typeof updateSchema>;
+export type Batch = z.infer<typeof batchSchema>;
+export type ReadFilterOperator = z.infer<typeof readFilterOperatorSchema>;
+export type ReadFilter = z.output<typeof readFilterSchema>;
+export type ReadFilterInput = z.input<typeof readFilterSchema>;
+export type ReadQuery = z.output<typeof readQuerySchema>;
+export type ReadQueryInput = z.input<typeof readQuerySchema>;
+export type PushResult = z.infer<typeof pushResultSchema>;
+export type Broadcast = z.infer<typeof broadcastSchema>;
+export type WebSocketAttachment = z.infer<typeof webSocketAttachmentSchema>;
 
-export interface LfsyncReadResult<T = unknown> {
+export interface ReadResult<T = unknown> {
   rows: Array<T>;
 }

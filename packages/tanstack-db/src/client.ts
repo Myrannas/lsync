@@ -1,9 +1,9 @@
 import { createTRPCProxyClient, type TRPCLink } from "@trpc/client";
 import {
-  parseLfsyncServerMessage,
-  sendLfsyncClientRpcRequest,
-  type LfsyncClientRpcRequest,
-  type LfsyncRpcId,
+  parseServerMessage,
+  sendClientRpcRequest,
+  type ClientRpcRequest,
+  type RpcId,
 } from "@lfsync/transport";
 import { observable } from "@trpc/server/observable";
 import type {
@@ -52,7 +52,7 @@ export function createClient(options: ClientOptions): Client {
       });
 
       ws.addEventListener("message", (event) => {
-        const message = parseLfsyncServerMessage(String(event.data));
+        const message = parseServerMessage(String(event.data));
 
         if ("method" in message) {
           for (const listener of listeners) {
@@ -88,7 +88,7 @@ export function createClient(options: ClientOptions): Client {
       });
 
       ws.addEventListener("error", () => {
-        reject(new Error("Unable to open lfsync WebSocket"));
+        reject(new Error("Unable to open sync WebSocket"));
       });
     });
 
@@ -114,7 +114,7 @@ export function createClient(options: ClientOptions): Client {
             });
 
             try {
-              sendLfsyncClientRpcRequest(ws, requestForOperation(id, op));
+              sendClientRpcRequest(ws, requestForOperation(id, op));
             } catch (error) {
               pending.delete(id);
               observer.error(error as never);
@@ -153,10 +153,7 @@ export function createClient(options: ClientOptions): Client {
   };
 }
 
-function takePending(
-  pending: Map<string, PendingRequest>,
-  id: LfsyncRpcId,
-): PendingRequest | undefined {
+function takePending(pending: Map<string, PendingRequest>, id: RpcId): PendingRequest | undefined {
   if (id === null || id === undefined) {
     return undefined;
   }
@@ -170,7 +167,7 @@ function takePending(
 function requestForOperation(
   id: string,
   op: { type: string; path: string; input: unknown },
-): LfsyncClientRpcRequest {
+): ClientRpcRequest {
   if (op.type === "mutation" && op.path === "push") {
     return {
       id,
@@ -197,5 +194,5 @@ function requestForOperation(
     };
   }
 
-  throw new Error(`Unsupported lfsync operation: ${op.type}.${op.path}`);
+  throw new Error(`Unsupported operation: ${op.type}.${op.path}`);
 }

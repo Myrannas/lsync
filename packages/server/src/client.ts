@@ -1,14 +1,14 @@
-export { lfsyncRouter, type LfsyncContext, type LfsyncRouter } from "./router";
+export { router, type Context, type Router } from "./router";
 export type {
-  LfsyncBatch,
-  LfsyncBroadcast,
-  LfsyncCollectionConfig,
-  LfsyncCollectionConfigs,
-  LfsyncOperationType,
-  LfsyncPushResult,
-  LfsyncReadFilter,
-  LfsyncReadFilterOperator,
-  LfsyncReadQuery,
-  LfsyncReadResult,
-  LfsyncUpdate,
+  Batch,
+  Broadcast,
+  CollectionConfig,
+  CollectionConfigs,
+  OperationType,
+  PushResult,
+  ReadFilter,
+  ReadFilterOperator,
+  ReadQuery,
+  ReadResult,
+  Update,
 } from "./types";

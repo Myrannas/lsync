@@ -1,11 +1,11 @@
 import type {
-  LfsyncBatch,
-  LfsyncCollectionConfigs,
-  LfsyncReadFilter,
-  LfsyncReadQuery,
-  LfsyncReadResult,
-  LfsyncSQLiteJsonIndexConfig,
-  LfsyncSQLiteJsonStorageConfig,
+  Batch,
+  CollectionConfigs,
+  ReadFilter,
+  ReadQuery,
+  ReadResult,
+  SQLiteJsonIndexConfig,
+  SQLiteJsonStorageConfig,
 } from "./types";
 
 export type SqlStorageValue = ArrayBuffer | string | number | null;
@@ -23,12 +23,10 @@ export interface SqlStorageLike {
 
 export interface SQLiteJsonTableOptions {
   tableName?: string;
-  indexes?: Array<Array<string> | LfsyncSQLiteJsonIndexConfig>;
+  indexes?: Array<Array<string> | SQLiteJsonIndexConfig>;
 }
 
-export function sqliteJsonTable(
-  options: SQLiteJsonTableOptions = {},
-): LfsyncSQLiteJsonStorageConfig {
+export function sqliteJsonTable(options: SQLiteJsonTableOptions = {}): SQLiteJsonStorageConfig {
   return {
     kind: "sqlite-json",
     ...(options.tableName ? { tableName: options.tableName } : {}),
@@ -40,7 +38,7 @@ export function sqliteJsonTable(
 
 export function ensureSQLiteJsonTables(
   sql: SqlStorageLike,
-  collections: LfsyncCollectionConfigs = {},
+  collections: CollectionConfigs = {},
 ): void {
   for (const [collectionName, collection] of Object.entries(collections)) {
     if (collection.storage?.kind !== "sqlite-json") {
@@ -67,8 +65,8 @@ export function ensureSQLiteJsonTables(
 
 export function applySQLiteJsonBatch(
   sql: SqlStorageLike,
-  batch: LfsyncBatch,
-  collections: LfsyncCollectionConfigs = {},
+  batch: Batch,
+  collections: CollectionConfigs = {},
 ): void {
   ensureSQLiteJsonTables(sql, collections);
 
@@ -131,18 +129,18 @@ export function applySQLiteJsonBatch(
 
 export function readSQLiteJsonRows(
   sql: SqlStorageLike,
-  query: LfsyncReadQuery,
-  collections: LfsyncCollectionConfigs = {},
-): LfsyncReadResult {
+  query: ReadQuery,
+  collections: CollectionConfigs = {},
+): ReadResult {
   ensureSQLiteJsonTables(sql, collections);
 
   const collection = collections[query.collection];
   if (!collection) {
     if (Object.keys(collections).length > 0) {
-      throw new Error(`Unknown lfsync collection: ${query.collection}`);
+      throw new Error(`Unknown collection: ${query.collection}`);
     }
 
-    throw new Error(`Cannot read unconfigured lfsync collection: ${query.collection}`);
+    throw new Error(`Cannot read unconfigured collection: ${query.collection}`);
   }
 
   if (collection.storage?.kind !== "sqlite-json") {
@@ -175,11 +173,11 @@ export function readSQLiteJsonRows(
   };
 }
 
-function tableName(collectionName: string, storage: LfsyncSQLiteJsonStorageConfig): string {
+function tableName(collectionName: string, storage: SQLiteJsonStorageConfig): string {
   return storage.tableName ?? collectionName;
 }
 
-function createIndexSql(table: string, index: LfsyncSQLiteJsonIndexConfig): string {
+function createIndexSql(table: string, index: SQLiteJsonIndexConfig): string {
   const name = index.name ?? `${table}_${index.fields.join("_")}_idx`;
   const fields = index.fields.map((field) => `json_extract(value, '$.${jsonPath(field)}')`);
 
@@ -201,7 +199,7 @@ function jsonPath(field: string): string {
   return field;
 }
 
-function filterSql(filter: LfsyncReadFilter, bindings: Array<unknown>): string {
+function filterSql(filter: ReadFilter, bindings: Array<unknown>): string {
   const field = `json_extract(value, '$.${jsonPath(filter.field)}')`;
 
   if (filter.op === "in") {

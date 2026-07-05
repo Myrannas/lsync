@@ -1,65 +1,24 @@
-# lfsync
+# lsync
 
-`lfsync` is an experimental sync transport for TanStack DB backed by a Cloudflare Durable Object.
-
-The current scope is intentionally small:
-
-- route `/sync/:id` to one Durable Object instance via `idFromName`
-- accept tRPC-shaped mutations over a native WebSocket
-- use Durable Object WebSocket hibernation through `state.acceptWebSocket`
-- support multiple logical collections per Durable Object
-- configure each collection with a schema and future extension points
-- validate collection payloads against server-side schemas before broadcasting
-- optionally persist collection rows into Durable Object SQLite as JSON
-- read persisted SQLite JSON rows with optional JSON-field filters
-- broadcast every valid submitted update batch to every socket connected to that room
-- expose a TanStack DB `CollectionConfig` factory for live collection updates
-
-Auth is intentionally left out for now.
+`lsync` is an experimental data sync library DB backed by a Cloudflare Durable Object.
 
 ## Packages
 
 - `@lfsync/server` exports the reusable Durable Object class, worker fetch handler, tRPC router, and shared wire types.
 - `@lfsync/tanstack-db` exports `collectionOptions`, a TanStack DB collection adapter.
-- `@lfsync/example-worker` is a minimal Cloudflare Worker using the reusable server package.
-- `@lfsync/example-react` is a Vite app with a shared todo collection.
 
 ## Local Development
 
-```sh
-corepack enable
-pnpm install
-pnpm build
-```
-
-Run the worker:
+Install vite plus https://viteplus.dev/guide/
 
 ```sh
-pnpm dev:worker
+vp install
 ```
-
-Run the React example in another terminal:
-
-```sh
-pnpm dev:react
-```
-
-Open two browser tabs with the same `room` query parameter:
-
-```text
-http://localhost:5173/?room=demo
-```
-
-Set `VITE_LFSYNC_URL` if the worker is not running on `ws://localhost:8787`.
 
 ## Example Worker
 
 ```ts
-import {
-  createLfsyncDurableObject,
-  createLfsyncWorkerHandler,
-  sqliteJsonTable,
-} from "@lfsync/server";
+import { createCollectionShard, createWorkerHandler, sqliteJsonTable } from "@lfsync/server";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -68,7 +27,7 @@ const todoSchema = z.object({
   completed: z.boolean(),
 });
 
-const LfsyncRoomBase = createLfsyncDurableObject({
+const CollectionShardBase = createCollectionShard({
   collections: {
     todos: {
       schema: todoSchema,
@@ -79,9 +38,9 @@ const LfsyncRoomBase = createLfsyncDurableObject({
   },
 });
 
-export class LfsyncRoom extends LfsyncRoomBase {}
+export class CollectionShard extends CollectionShardBase {}
 
-export default createLfsyncWorkerHandler();
+export default createWorkerHandler();
 ```
 
 ## Example Collection

@@ -3,10 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2026-07-04"
 
 [[durable_objects.bindings]]
-name = "LFSYNC_ROOMS"
-class_name = "LfsyncRoom"
+name = "SYNC_SHARDS"
+class_name = "CollectionShard"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["LfsyncRoom"]
-
+new_sqlite_classes = ["CollectionShard"]

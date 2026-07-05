@@ -1,23 +1,23 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type {
-  LfsyncBatch,
-  LfsyncBroadcast,
-  LfsyncPushResult,
-  LfsyncReadFilterInput,
-  LfsyncReadFilterOperator,
-  LfsyncReadQueryInput,
-  LfsyncReadResult,
-  LfsyncUpdate,
+  Batch as TransportBatch,
+  Broadcast as TransportBroadcast,
+  PushResult as TransportPushResult,
+  ReadFilterInput,
+  ReadFilterOperator as TransportReadFilterOperator,
+  ReadQueryInput,
+  ReadResult as TransportReadResult,
+  Update as TransportUpdate,
 } from "@lfsync/transport";
 
-export type Update = LfsyncUpdate;
-export type Batch = LfsyncBatch;
-export type Broadcast = LfsyncBroadcast;
-export type PushResult = LfsyncPushResult;
-export type ReadFilterOperator = LfsyncReadFilterOperator;
-export type ReadFilter = LfsyncReadFilterInput;
-export type ReadQuery = LfsyncReadQueryInput;
-export type ReadResult<T = unknown> = LfsyncReadResult<T>;
+export type Update = TransportUpdate;
+export type Batch = TransportBatch;
+export type Broadcast = TransportBroadcast;
+export type PushResult = TransportPushResult;
+export type ReadFilterOperator = TransportReadFilterOperator;
+export type ReadFilter = ReadFilterInput;
+export type ReadQuery = ReadQueryInput;
+export type ReadResult<T = unknown> = TransportReadResult<T>;
 
 export interface ClientOptions {
   url: string | URL;

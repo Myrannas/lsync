@@ -1,34 +1,29 @@
+import { parseClientRpcRequest, readRpcId, sendServerMessage, type RpcId } from "@lfsync/transport";
+import { router } from "./router";
 import {
-  parseLfsyncClientRpcRequest,
-  readLfsyncRpcId,
-  sendLfsyncServerMessage,
-  type LfsyncRpcId,
-} from "@lfsync/transport";
-import { lfsyncRouter } from "./router";
-import {
-  type LfsyncBatch,
-  type LfsyncBroadcast,
-  type LfsyncCollectionConfigs,
-  type LfsyncReadQuery,
-  type LfsyncReadResult,
-  type LfsyncWebSocketAttachment,
+  type Batch,
+  type Broadcast,
+  type CollectionConfigs,
+  type ReadQuery,
+  type ReadResult,
+  type WebSocketAttachment,
 } from "./types";
 import { applySQLiteJsonBatch, readSQLiteJsonRows } from "./storage";
-import { validateLfsyncBatch } from "./validation";
+import { validateBatch } from "./validation";
 
-export interface LfsyncEnv {
-  LFSYNC_ROOMS: DurableObjectNamespace;
+export interface Env {
+  SYNC_SHARDS: DurableObjectNamespace;
 }
 
-export interface LfsyncDurableObjectOptions {
-  collections?: LfsyncCollectionConfigs;
+export interface CollectionShardOptions {
+  collections?: CollectionConfigs;
 }
 
-export class LfsyncDurableObject implements DurableObject {
+export class CollectionShardDurableObject implements DurableObject {
   constructor(
     private readonly state: DurableObjectState,
-    private readonly env: LfsyncEnv,
-    private readonly options: LfsyncDurableObjectOptions = {},
+    private readonly env: Env,
+    private readonly options: CollectionShardOptions = {},
   ) {}
 
   async fetch(request: Request): Promise<Response> {
@@ -47,7 +42,7 @@ export class LfsyncDurableObject implements DurableObject {
     server.serializeAttachment({
       clientId,
       connectedAt: Date.now(),
-    } satisfies LfsyncWebSocketAttachment);
+    } satisfies WebSocketAttachment);
 
     return new Response(null, {
       status: 101,
@@ -59,10 +54,10 @@ export class LfsyncDurableObject implements DurableObject {
     const text = typeof message === "string" ? message : new TextDecoder().decode(message);
 
     try {
-      const request = parseLfsyncClientRpcRequest(text);
+      const request = parseClientRpcRequest(text);
 
-      const caller = lfsyncRouter.createCaller({
-        roomId: this.roomId(),
+      const caller = router.createCaller({
+        shardId: this.shardId(),
         validate: (input) => this.validate(input),
         persist: (input) => this.persist(input),
         publish: (input) => this.publish(input),
@@ -75,22 +70,22 @@ export class LfsyncDurableObject implements DurableObject {
           : await caller.read(request.params.input.json);
       this.sendRpcResult(ws, request.id, result);
     } catch (error) {
-      this.sendRpcError(ws, readLfsyncRpcId(text), error);
+      this.sendRpcError(ws, readRpcId(text), error);
     }
   }
 
   webSocketClose(): void {
-    // Hibernation already releases request state; no in-memory room list is kept.
+    // Hibernation already releases request state; no in-memory shard list is kept.
   }
 
   webSocketError(): void {
     // Cloudflare will discard errored sockets. The next client reconnect creates a fresh socket.
   }
 
-  private publish(batch: LfsyncBatch): void {
-    const payload: LfsyncBroadcast = {
+  private publish(batch: Batch): void {
+    const payload: Broadcast = {
       type: "updates",
-      roomId: this.roomId(),
+      shardId: this.shardId(),
       updates: batch.updates,
     };
 
@@ -105,28 +100,28 @@ export class LfsyncDurableObject implements DurableObject {
     } as const;
 
     for (const socket of this.state.getWebSockets()) {
-      sendLfsyncServerMessage(socket, message);
+      sendServerMessage(socket, message);
     }
   }
 
-  private validate(batch: LfsyncBatch): void {
-    validateLfsyncBatch(batch, this.options.collections);
+  private validate(batch: Batch): void {
+    validateBatch(batch, this.options.collections);
   }
 
-  private persist(batch: LfsyncBatch): void {
+  private persist(batch: Batch): void {
     applySQLiteJsonBatch(this.state.storage.sql, batch, this.options.collections);
   }
 
-  private read(query: LfsyncReadQuery): LfsyncReadResult {
+  private read(query: ReadQuery): ReadResult {
     return readSQLiteJsonRows(this.state.storage.sql, query, this.options.collections);
   }
 
-  private roomId(): string {
+  private shardId(): string {
     return this.state.id.toString();
   }
 
-  private sendRpcResult(ws: WebSocket, id: LfsyncRpcId, result: unknown): void {
-    sendLfsyncServerMessage(ws, {
+  private sendRpcResult(ws: WebSocket, id: RpcId, result: unknown): void {
+    sendServerMessage(ws, {
       id,
       result: {
         type: "data",
@@ -137,9 +132,9 @@ export class LfsyncDurableObject implements DurableObject {
     });
   }
 
-  private sendRpcError(ws: WebSocket, id: LfsyncRpcId, error: unknown): void {
+  private sendRpcError(ws: WebSocket, id: RpcId, error: unknown): void {
     const message = error instanceof Error ? error.message : "Unknown error";
-    sendLfsyncServerMessage(ws, {
+    sendServerMessage(ws, {
       id,
       error: {
         message,
@@ -148,27 +143,27 @@ export class LfsyncDurableObject implements DurableObject {
   }
 }
 
-export function createLfsyncDurableObject(
-  options: LfsyncDurableObjectOptions,
-): typeof LfsyncDurableObject {
-  return class ConfiguredLfsyncDurableObject extends LfsyncDurableObject {
-    constructor(state: DurableObjectState, env: LfsyncEnv) {
+export function createCollectionShard(
+  options: CollectionShardOptions,
+): typeof CollectionShardDurableObject {
+  return class ConfiguredCollectionShard extends CollectionShardDurableObject {
+    constructor(state: DurableObjectState, env: Env) {
       super(state, env, options);
     }
   };
 }
 
-export interface LfsyncWorkerOptions {
-  binding?: keyof LfsyncEnv;
+export interface WorkerOptions {
+  binding?: keyof Env;
   routePattern?: RegExp;
 }
 
-export function createLfsyncWorkerHandler(options: LfsyncWorkerOptions = {}) {
-  const binding = options.binding ?? "LFSYNC_ROOMS";
+export function createWorkerHandler(options: WorkerOptions = {}) {
+  const binding = options.binding ?? "SYNC_SHARDS";
   const routePattern = options.routePattern ?? /^\/sync\/([^/]+)$/;
 
   return {
-    fetch(request: Request, env: LfsyncEnv): Promise<Response> | Response {
+    fetch(request: Request, env: Env): Promise<Response> | Response {
       const url = new URL(request.url);
       const match = url.pathname.match(routePattern);
 

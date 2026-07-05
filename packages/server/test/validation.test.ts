@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { validateLfsyncBatch } from "../src/validation";
-import type { LfsyncBatch, LfsyncCollectionConfigs } from "../src/types";
+import { validateBatch } from "../src/validation";
+import type { Batch, CollectionConfigs } from "../src/types";
 
 const todoSchema = z.object({
   id: z.string(),
@@ -9,22 +9,22 @@ const todoSchema = z.object({
   completed: z.boolean(),
 });
 
-const collections: LfsyncCollectionConfigs = {
+const collections: CollectionConfigs = {
   todos: {
     schema: todoSchema,
   },
 };
 
-function batch(value: LfsyncBatch["updates"][number]): LfsyncBatch {
+function batch(value: Batch["updates"][number]): Batch {
   return {
     updates: [value],
   };
 }
 
-describe("validateLfsyncBatch", () => {
+describe("validateBatch", () => {
   it("accepts inserts that match the configured collection schema", () => {
     expect(() =>
-      validateLfsyncBatch(
+      validateBatch(
         batch({
           id: "m1",
           collection: "todos",
@@ -40,7 +40,7 @@ describe("validateLfsyncBatch", () => {
 
   it("accepts partial updates for object schemas", () => {
     expect(() =>
-      validateLfsyncBatch(
+      validateBatch(
         batch({
           id: "m2",
           collection: "todos",
@@ -56,7 +56,7 @@ describe("validateLfsyncBatch", () => {
 
   it("rejects writes for unknown configured collections", () => {
     expect(() =>
-      validateLfsyncBatch(
+      validateBatch(
         batch({
           id: "m3",
           collection: "notes",
@@ -67,14 +67,14 @@ describe("validateLfsyncBatch", () => {
         }),
         collections,
       ),
-    ).toThrow("Unknown lfsync collection: notes");
+    ).toThrow("Unknown collection: notes");
   });
 
   it("rejects invalid insert payloads before publish", () => {
     let error: unknown;
 
     try {
-      validateLfsyncBatch(
+      validateBatch(
         batch({
           id: "m4",
           collection: "todos",
@@ -94,7 +94,7 @@ describe("validateLfsyncBatch", () => {
 
   it("skips schema parsing when no collection registry is configured", () => {
     expect(() =>
-      validateLfsyncBatch(
+      validateBatch(
         batch({
           id: "m5",
           collection: "anything",

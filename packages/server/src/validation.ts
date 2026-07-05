@@ -1,10 +1,7 @@
 import { z } from "zod";
-import type { LfsyncBatch, LfsyncCollectionConfigs } from "./types";
+import type { Batch, CollectionConfigs } from "./types";
 
-export function validateLfsyncBatch(
-  batch: LfsyncBatch,
-  collections?: LfsyncCollectionConfigs,
-): void {
+export function validateBatch(batch: Batch, collections?: CollectionConfigs): void {
   for (const update of batch.updates) {
     const schema = schemaFor(update.collection, collections);
 
@@ -21,15 +18,12 @@ export function validateLfsyncBatch(
   }
 }
 
-function schemaFor(
-  collection: string,
-  collections?: LfsyncCollectionConfigs,
-): z.ZodTypeAny | undefined {
+function schemaFor(collection: string, collections?: CollectionConfigs): z.ZodTypeAny | undefined {
   const configured = collections?.[collection];
 
   if (!configured) {
     if (collections && Object.keys(collections).length > 0) {
-      throw new Error(`Unknown lfsync collection: ${collection}`);
+      throw new Error(`Unknown collection: ${collection}`);
     }
 
     return undefined;

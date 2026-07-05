@@ -1,48 +1,48 @@
 import type { z } from "zod";
 
 export {
-  lfsyncBatchSchema,
-  lfsyncBroadcastSchema,
-  lfsyncOperationTypeSchema,
-  lfsyncPushResultSchema,
-  lfsyncReadFilterOperatorSchema,
-  lfsyncReadFilterSchema,
-  lfsyncReadQuerySchema,
-  lfsyncReadResultSchema,
-  lfsyncUpdateSchema,
-  lfsyncWebSocketAttachmentSchema,
+  batchSchema,
+  broadcastSchema,
+  operationTypeSchema,
+  pushResultSchema,
+  readFilterOperatorSchema,
+  readFilterSchema,
+  readQuerySchema,
+  readResultSchema,
+  updateSchema,
+  webSocketAttachmentSchema,
 } from "@lfsync/transport";
 export type {
-  LfsyncBatch,
-  LfsyncBroadcast,
-  LfsyncOperationType,
-  LfsyncPushResult,
-  LfsyncReadFilter,
-  LfsyncReadFilterInput,
-  LfsyncReadFilterOperator,
-  LfsyncReadQuery,
-  LfsyncReadQueryInput,
-  LfsyncReadResult,
-  LfsyncUpdate,
-  LfsyncWebSocketAttachment,
+  Batch,
+  Broadcast,
+  OperationType,
+  PushResult,
+  ReadFilter,
+  ReadFilterInput,
+  ReadFilterOperator,
+  ReadQuery,
+  ReadQueryInput,
+  ReadResult,
+  Update,
+  WebSocketAttachment,
 } from "@lfsync/transport";
 
-export interface LfsyncCollectionConfig {
+export interface CollectionConfig {
   schema: z.ZodTypeAny;
-  storage?: LfsyncCollectionStorageConfig;
+  storage?: CollectionStorageConfig;
 }
 
-export type LfsyncCollectionConfigs = Record<string, LfsyncCollectionConfig>;
+export type CollectionConfigs = Record<string, CollectionConfig>;
 
-export interface LfsyncSQLiteJsonIndexConfig {
+export interface SQLiteJsonIndexConfig {
   name?: string;
   fields: Array<string>;
 }
 
-export interface LfsyncSQLiteJsonStorageConfig {
+export interface SQLiteJsonStorageConfig {
   kind: "sqlite-json";
   tableName?: string;
-  indexes: Array<LfsyncSQLiteJsonIndexConfig>;
+  indexes: Array<SQLiteJsonIndexConfig>;
 }
 
-export type LfsyncCollectionStorageConfig = LfsyncSQLiteJsonStorageConfig;
+export type CollectionStorageConfig = SQLiteJsonStorageConfig;

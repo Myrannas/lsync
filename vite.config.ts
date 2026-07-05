@@ -1,6 +1,15 @@
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@lfsync/server/client": new URL("./packages/server/src/client.ts", import.meta.url).pathname,
+      "@lfsync/server": new URL("./packages/server/src/index.ts", import.meta.url).pathname,
+      "@lfsync/tanstack-db": new URL("./packages/tanstack-db/src/index.ts", import.meta.url)
+        .pathname,
+      "@lfsync/transport": new URL("./packages/transport/src/index.ts", import.meta.url).pathname,
+    },
+  },
   run: {
     tasks: {
       check: ["vp check", "vp run -r astGrep"],

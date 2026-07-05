@@ -1,8 +1,4 @@
-import {
-  createLfsyncDurableObject,
-  createLfsyncWorkerHandler,
-  sqliteJsonTable,
-} from "@lfsync/server";
+import { createCollectionShard, createWorkerHandler, sqliteJsonTable } from "@lfsync/server";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -11,7 +7,7 @@ const todoSchema = z.object({
   completed: z.boolean(),
 });
 
-const LfsyncRoomBase = createLfsyncDurableObject({
+const CollectionShardBase = createCollectionShard({
   collections: {
     todos: {
       schema: todoSchema,
@@ -22,6 +18,6 @@ const LfsyncRoomBase = createLfsyncDurableObject({
   },
 });
 
-export class LfsyncRoom extends LfsyncRoomBase {}
+export class CollectionShard extends CollectionShardBase {}
 
-export default createLfsyncWorkerHandler();
+export default createWorkerHandler();

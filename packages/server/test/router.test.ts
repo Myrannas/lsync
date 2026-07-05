@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
-import { lfsyncRouter } from "../src/router";
-import type { LfsyncBatch } from "../src/types";
+import { router } from "../src/router";
+import type { Batch } from "../src/types";
 
-const batch: LfsyncBatch = {
+const batch: Batch = {
   updates: [
     {
       id: "m1",
@@ -15,11 +15,11 @@ const batch: LfsyncBatch = {
   ],
 };
 
-describe("lfsyncRouter", () => {
+describe("router", () => {
   it("validates and persists before publishing", async () => {
     const calls: Array<string> = [];
-    const caller = lfsyncRouter.createCaller({
-      roomId: "room-1",
+    const caller = router.createCaller({
+      shardId: "shard-1",
       validate: () => calls.push("validate"),
       persist: () => calls.push("persist"),
       publish: () => calls.push("publish"),
@@ -31,8 +31,8 @@ describe("lfsyncRouter", () => {
   });
 
   it("reads rows through the configured context", async () => {
-    const caller = lfsyncRouter.createCaller({
-      roomId: "room-1",
+    const caller = router.createCaller({
+      shardId: "shard-1",
       validate: () => undefined,
       persist: () => undefined,
       publish: () => undefined,
