@@ -1,11 +1,13 @@
-# lsync
+# Lightweight Sync
 
 `lsync` is an experimental data sync library DB backed by a Cloudflare Durable Object.
+It us designed to be combined with tanstack-db to allow a dataset to be stored server and
+be quickly replicated between connected users.
 
 ## Packages
 
-- `@lfsync/server` exports the reusable Durable Object class, worker fetch handler, tRPC router, and shared wire types.
-- `@lfsync/tanstack-db` exports `collectionOptions`, a TanStack DB collection adapter.
+- `lsync-server` exports the reusable Durable Object class, worker fetch handler, tRPC router, and shared wire types.
+- `lsync-tanstack-db` exports `collectionOptions`, a TanStack DB collection adapter.
 
 ## Local Development
 
@@ -18,7 +20,12 @@ vp install
 ## Example Worker
 
 ```ts
-import { createCollectionShard, createWorkerHandler, sqliteJsonTable } from "@lfsync/server";
+import {
+  CollectionShardDurableObject,
+  createWorkerHandler,
+  sqliteJsonTable,
+  type Env,
+} from "lsync-server";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -27,18 +34,20 @@ const todoSchema = z.object({
   completed: z.boolean(),
 });
 
-const CollectionShardBase = createCollectionShard({
-  collections: {
-    todos: {
-      schema: todoSchema,
-      storage: sqliteJsonTable({
-        indexes: [["completed"]],
-      }),
-    },
-  },
-});
-
-export class CollectionShard extends CollectionShardBase {}
+export class CollectionShard extends CollectionShardDurableObject {
+  constructor(state: DurableObjectState, env: Env) {
+    super(state, env, {
+      collections: {
+        todos: {
+          schema: todoSchema,
+          storage: sqliteJsonTable({
+            indexes: [["completed"]],
+          }),
+        },
+      },
+    });
+  }
+}
 
 export default createWorkerHandler();
 ```
@@ -47,7 +56,7 @@ export default createWorkerHandler();
 
 ```ts
 import { createCollection } from "@tanstack/db";
-import { collectionOptions } from "@lfsync/tanstack-db";
+import { collectionOptions } from "lsync-tanstack-db";
 
 const todos = createCollection(
   collectionOptions({

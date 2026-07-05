@@ -4,7 +4,7 @@ import {
   sendClientRpcRequest,
   type ClientRpcRequest,
   type RpcId,
-} from "@lfsync/transport";
+} from "lsync-transport";
 import { observable } from "@trpc/server/observable";
 import type {
   Batch,

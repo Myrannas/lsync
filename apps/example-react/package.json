@@ -8,10 +8,10 @@
     "dev": "vp dev --host 0.0.0.0"
   },
   "dependencies": {
-    "@lfsync/tanstack-db": "workspace:*",
     "@tanstack/db": "catalog:",
     "@tanstack/react-db": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "lsync-tanstack-db": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
     "vite": "catalog:",

@@ -11,7 +11,7 @@ export {
   readResultSchema,
   updateSchema,
   webSocketAttachmentSchema,
-} from "@lfsync/transport";
+} from "lsync-transport";
 export type {
   Batch,
   Broadcast,
@@ -25,7 +25,7 @@ export type {
   ReadResult,
   Update,
   WebSocketAttachment,
-} from "@lfsync/transport";
+} from "lsync-transport";
 
 export interface CollectionConfig {
   schema: z.ZodTypeAny;

@@ -1,6 +1,6 @@
 import { createCollection } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
-import { collectionOptions } from "@lfsync/tanstack-db";
+import { collectionOptions } from "lsync-tanstack-db";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { z } from "zod";

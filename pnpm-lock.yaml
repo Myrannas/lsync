@@ -77,7 +77,7 @@ importers:
 
   apps/example-react:
     dependencies:
-      '@lfsync/tanstack-db':
+      'lsync-tanstack-db':
         specifier: workspace:*
         version: link:../../packages/tanstack-db
       '@tanstack/db':
@@ -117,7 +117,7 @@ importers:
 
   apps/example-worker:
     dependencies:
-      '@lfsync/server':
+      'lsync-server':
         specifier: workspace:*
         version: link:../../packages/server
       zod:
@@ -136,7 +136,7 @@ importers:
 
   packages/server:
     dependencies:
-      '@lfsync/transport':
+      'lsync-transport':
         specifier: workspace:*
         version: link:../transport
       '@trpc/server':
@@ -161,7 +161,7 @@ importers:
 
   packages/tanstack-db:
     dependencies:
-      '@lfsync/transport':
+      'lsync-transport':
         specifier: workspace:*
         version: link:../transport
       '@standard-schema/spec':

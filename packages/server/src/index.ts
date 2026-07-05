@@ -1,8 +1,4 @@
-export {
-  CollectionShardDurableObject,
-  createCollectionShard,
-  createWorkerHandler,
-} from "./durable-object";
+export { CollectionShardDurableObject, createWorkerHandler } from "./durable-object";
 export { router, type Context, type Router } from "./router";
 export {
   applySQLiteJsonBatch,

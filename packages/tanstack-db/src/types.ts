@@ -8,7 +8,7 @@ import type {
   ReadQueryInput,
   ReadResult as TransportReadResult,
   Update as TransportUpdate,
-} from "@lfsync/transport";
+} from "lsync-transport";
 
 export type Update = TransportUpdate;
 export type Batch = TransportBatch;

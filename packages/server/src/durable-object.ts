@@ -1,4 +1,4 @@
-import { parseClientRpcRequest, readRpcId, sendServerMessage, type RpcId } from "@lfsync/transport";
+import { parseClientRpcRequest, readRpcId, sendServerMessage, type RpcId } from "lsync-transport";
 import { router } from "./router";
 import {
   type Batch,
@@ -141,16 +141,6 @@ export class CollectionShardDurableObject implements DurableObject {
       },
     });
   }
-}
-
-export function createCollectionShard(
-  options: CollectionShardOptions,
-): typeof CollectionShardDurableObject {
-  return class ConfiguredCollectionShard extends CollectionShardDurableObject {
-    constructor(state: DurableObjectState, env: Env) {
-      super(state, env, options);
-    }
-  };
 }
 
 export interface WorkerOptions {

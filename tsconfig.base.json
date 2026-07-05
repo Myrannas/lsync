@@ -14,10 +14,10 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "paths": {
-      "@lfsync/server": ["./packages/server/src/index.ts"],
-      "@lfsync/server/client": ["./packages/server/src/client.ts"],
-      "@lfsync/tanstack-db": ["./packages/tanstack-db/src/index.ts"],
-      "@lfsync/transport": ["./packages/transport/src/index.ts"]
+      "lsync-server": ["./packages/server/src/index.ts"],
+      "lsync-server/client": ["./packages/server/src/client.ts"],
+      "lsync-tanstack-db": ["./packages/tanstack-db/src/index.ts"],
+      "lsync-transport": ["./packages/transport/src/index.ts"]
     }
   }
 }

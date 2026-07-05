@@ -1,5 +1,5 @@
 {
-  "name": "@lfsync/tanstack-db",
+  "name": "lsync-tanstack-db",
   "version": "0.0.0",
   "type": "module",
   "sideEffects": false,
@@ -11,11 +11,11 @@
   },
   "scripts": {},
   "dependencies": {
-    "@lfsync/transport": "workspace:*",
     "@standard-schema/spec": "catalog:",
     "@tanstack/db": "catalog:",
     "@trpc/client": "catalog:",
-    "@trpc/server": "catalog:"
+    "@trpc/server": "catalog:",
+    "lsync-transport": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:",

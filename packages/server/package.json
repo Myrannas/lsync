@@ -1,5 +1,5 @@
 {
-  "name": "@lfsync/server",
+  "name": "lsync-server",
   "version": "0.0.0",
   "type": "module",
   "sideEffects": false,
@@ -15,8 +15,8 @@
   },
   "scripts": {},
   "dependencies": {
-    "@lfsync/transport": "workspace:*",
     "@trpc/server": "catalog:",
+    "lsync-transport": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
