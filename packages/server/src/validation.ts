@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resolveCollection } from "./collections";
 import type { Batch, CollectionConfigs } from "./types";
 
 export function validateBatch(batch: Batch, collections?: CollectionConfigs): void {
@@ -19,7 +20,7 @@ export function validateBatch(batch: Batch, collections?: CollectionConfigs): vo
 }
 
 function schemaFor(collection: string, collections?: CollectionConfigs): z.ZodTypeAny | undefined {
-  const configured = collections?.[collection];
+  const configured = resolveCollection(collection, collections);
 
   if (!configured) {
     if (collections && Object.keys(collections).length > 0) {
@@ -29,5 +30,5 @@ function schemaFor(collection: string, collections?: CollectionConfigs): z.ZodTy
     return undefined;
   }
 
-  return configured.schema;
+  return configured.collection.schema;
 }

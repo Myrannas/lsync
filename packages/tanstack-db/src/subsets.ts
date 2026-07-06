@@ -17,6 +17,11 @@ export interface RetainResult {
   loaded: boolean;
 }
 
+export interface TrackRowResult {
+  before: boolean;
+  after: boolean;
+}
+
 export class SubsetTracker<T extends object, TKey extends string | number> {
   private readonly subsets = new Map<string, SubsetState<TKey>>();
   private readonly keyRefs = new Map<TKey, number>();
@@ -66,22 +71,36 @@ export class SubsetTracker<T extends object, TKey extends string | number> {
   }
 
   trackRow(row: T): boolean {
-    let matched = false;
+    const result = this.reconcileRow(row);
+    return result.before || result.after;
+  }
+
+  reconcileRow(row: T): TrackRowResult {
     const key = this.getKey(row);
+    let before = false;
 
     this.subsets.forEach((subset) => {
-      if (!matchesSubset(row, subset)) {
+      const had = subset.keys.has(key);
+      before ||= had;
+
+      if (matchesSubset(row, subset)) {
+        if (!had) {
+          subset.keys.add(key);
+          this.keyRefs.set(key, (this.keyRefs.get(key) ?? 0) + 1);
+        }
         return;
       }
 
-      matched = true;
-      if (!subset.keys.has(key)) {
-        subset.keys.add(key);
-        this.keyRefs.set(key, (this.keyRefs.get(key) ?? 0) + 1);
+      if (had) {
+        subset.keys.delete(key);
+        this.releaseKey(key);
       }
     });
 
-    return matched || this.keyRefs.has(key);
+    return {
+      before,
+      after: this.keyRefs.has(key),
+    };
   }
 
   deleteKey(key: TKey): boolean {
@@ -139,15 +158,22 @@ export class SubsetTracker<T extends object, TKey extends string | number> {
   private releaseKeys(keys: Set<TKey>): Array<TKey> {
     const removed: Array<TKey> = [];
     keys.forEach((key) => {
-      const refs = (this.keyRefs.get(key) ?? 0) - 1;
-      if (refs <= 0) {
-        this.keyRefs.delete(key);
+      if (this.releaseKey(key)) {
         removed.push(key);
-      } else {
-        this.keyRefs.set(key, refs);
       }
     });
     return removed;
+  }
+
+  private releaseKey(key: TKey): boolean {
+    const refs = (this.keyRefs.get(key) ?? 0) - 1;
+    if (refs <= 0) {
+      this.keyRefs.delete(key);
+      return true;
+    }
+
+    this.keyRefs.set(key, refs);
+    return false;
   }
 }
 

@@ -17,13 +17,13 @@ export class CollectionShard extends CollectionShardDurableObject {
   constructor(state: DurableObjectState, env: Env) {
     super(state, env, {
       collections: {
-        todos: {
+        "/todos/": {
           schema: todoSchema,
           storage: sqliteJsonTable({
             indexes: [["completed"]],
           }),
         },
-        users: {
+        "/users/": {
           schema: z.object({
             id: z.string(),
             name: z.string(),

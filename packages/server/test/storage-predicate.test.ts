@@ -23,7 +23,7 @@ describe("SQLite JSON read predicates", () => {
 
     const statement = sql.statements.at(-1)!;
     expect(statement.query).toContain("(json_extract(value, ?) = ? OR json_extract(value, ?) = ?)");
-    expect(statement.bindings).toEqual(["$.completed", 0, "$.text", "Mine", 1000, 0]);
+    expect(statement.bindings).toEqual(["/todos/", "$.completed", 0, "$.text", "Mine", 1000, 0]);
   });
 
   it("matches JSON false values with SQLite numeric boolean bindings", () => {
@@ -51,6 +51,6 @@ describe("SQLite JSON read predicates", () => {
     );
 
     expect(result.rows).toEqual([{ id: "1", text: "Open", completed: false }]);
-    expect(sql.statements.at(-1)!.bindings).toEqual(["$.completed", 0, 1000, 0]);
+    expect(sql.statements.at(-1)!.bindings).toEqual(["/todos/", "$.completed", 0, 1000, 0]);
   });
 });

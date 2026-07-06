@@ -1,6 +1,15 @@
 export { createBatch, toChangeMessage } from "./batch";
 export { createClient } from "./client";
 export { collectionOptions } from "./collection";
+export { createCollectionType } from "./collection-type";
+export type {
+  ChildCollectionTypeOptions,
+  CollectionEntity,
+  CollectionScopeParams,
+  CollectionType,
+  CollectionTypeOptions,
+  CollectionUsage,
+} from "./collection-type";
 export type {
   ApiCall,
   ApiCallArgs,
