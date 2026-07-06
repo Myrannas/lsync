@@ -210,7 +210,7 @@ predicates for ordered pagination.
 
 ## Notes
 
-The custom WebSocket transport is deliberately hibernation-friendly. tRPC's stock WebSocket server adapter targets a long-lived Node-style socket server, while Cloudflare Durable Objects hibernate by rehydrating requests into `webSocketMessage` callbacks.
+The Worker keeps the public HTTP/WebSocket boundary, then calls the Durable Object through a typed RPC method. The custom WebSocket transport is deliberately hibernation-friendly: tRPC's stock WebSocket server adapter targets a long-lived Node-style socket server, while Cloudflare Durable Objects hibernate by rehydrating requests into `webSocketMessage` callbacks.
 
 The adapter applies updates emitted by the same client by default. Local mutations are optimistic,
 and the server echo is still useful as the accepted sync event that reconciles the synced base and

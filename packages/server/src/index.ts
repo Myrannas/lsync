@@ -83,5 +83,5 @@ export type {
   Update,
   WebSocketAttachment,
 } from "./types";
-export type { CollectionShardOptions, Env } from "./durable-object";
-export type { WorkerOptions } from "./worker";
+export type { CollectionShardOptions } from "./durable-object";
+export type { Env, WorkerOptions } from "./worker";

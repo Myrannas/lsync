@@ -1,4 +1,8 @@
-import type { Env } from "./durable-object";
+import type { CollectionShardDurableObject } from "./durable-object";
+
+export interface Env {
+  SYNC_SHARDS: DurableObjectNamespace<CollectionShardDurableObject>;
+}
 
 export interface WorkerOptions {
   binding?: keyof Env;
@@ -18,14 +22,14 @@ export function createWorkerHandler(options: WorkerOptions = {}) {
         return new Response("Not found", { status: 404 });
       }
 
-      const namespace = env[binding] as DurableObjectNamespace | undefined;
+      const namespace = env[binding];
       if (!namespace) {
         return new Response(`Missing Durable Object binding: ${String(binding)}`, { status: 500 });
       }
 
       const id = namespace.idFromName(decodeURIComponent(match[1]));
       const stub = namespace.get(id);
-      return stub.fetch(request);
+      return stub.acceptWebSocket(request);
     },
   };
 }
