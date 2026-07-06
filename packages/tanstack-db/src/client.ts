@@ -1,11 +1,8 @@
 import { createTRPCProxyClient, type TRPCLink } from "@trpc/client";
-import {
-  parseServerMessage,
-  sendClientRpcRequest,
-  type ClientRpcRequest,
-  type RpcId,
-} from "lsync-transport";
+import { parseServerMessage, sendClientRpcRequest, type ClientRpcRequest } from "lsync-transport";
 import { observable } from "@trpc/server/observable";
+import { ClientSubscriptions } from "./client-subscriptions";
+import { requestForOperation, takePending, type PendingRequest } from "./client-rpc";
 import type {
   ApiCall,
   ApiCallArgs,
@@ -13,20 +10,15 @@ import type {
   ApiOutput,
   ApiPath,
   Batch,
-  Broadcast,
   Client,
   ClientOptions,
   PushResult,
   ReadQuery,
   ReadResult,
+  SubscriptionControlResult,
 } from "./types";
 
 type Router = any;
-
-interface PendingRequest {
-  resolve: (value: unknown) => void;
-  reject: (error: Error) => void;
-}
 
 interface SharedClientEntry {
   client: Client;
@@ -44,11 +36,11 @@ export function createClient<TApi extends ApiContract = ApiContract>(
   options: ClientOptions,
 ): Client<TApi> {
   const clientId = options.clientId ?? crypto.randomUUID();
-  const listeners = new Set<(broadcast: Broadcast) => void>();
   const pending = new Map<string, PendingRequest>();
   let nextId = 1;
   let socket: WebSocket | undefined;
   let connectPromise: Promise<WebSocket> | undefined;
+  let subscriptions: ClientSubscriptions;
 
   const open = async (): Promise<WebSocket> => {
     if (socket?.readyState === WebSocket.OPEN) {
@@ -66,18 +58,23 @@ export function createClient<TApi extends ApiContract = ApiContract>(
 
       ws.addEventListener("open", () => {
         socket = ws;
-        connectPromise = undefined;
-        resolve(ws);
+        subscriptions
+          .replay(ws)
+          .then(() => {
+            connectPromise = undefined;
+            resolve(ws);
+          })
+          .catch((error) => {
+            connectPromise = undefined;
+            reject(error);
+          });
       });
 
       ws.addEventListener("message", (event) => {
         const message = parseServerMessage(String(event.data));
 
         if ("method" in message) {
-          for (const listener of listeners) {
-            listener(message.params.input.json);
-          }
-
+          subscriptions.dispatch(message.params.input.json);
           return;
         }
 
@@ -114,6 +111,54 @@ export function createClient<TApi extends ApiContract = ApiContract>(
     return connectPromise;
   };
 
+  const sendRequest = <TResult>(ws: WebSocket, request: ClientRpcRequest): Promise<TResult> => {
+    return new Promise((resolve, reject) => {
+      const id = request.id;
+      if (id === null || id === undefined) {
+        reject(new Error("RPC request requires an id"));
+        return;
+      }
+
+      pending.set(String(id), {
+        resolve: (value) => resolve(value as TResult),
+        reject,
+      });
+
+      try {
+        sendClientRpcRequest(ws, request);
+      } catch (error) {
+        pending.delete(String(id));
+        reject(error);
+      }
+    });
+  };
+
+  const sendSubscriptionControl = async (
+    ws: WebSocket,
+    path: "subscribe" | "unsubscribe",
+    collection: string,
+  ): Promise<SubscriptionControlResult> => {
+    const id = String(nextId++);
+    return sendRequest<SubscriptionControlResult>(ws, {
+      id,
+      method: "mutation",
+      params: {
+        path,
+        input: {
+          json: {
+            collection,
+          },
+        },
+      },
+    });
+  };
+
+  subscriptions = new ClientSubscriptions({
+    currentSocket: () => socket,
+    open,
+    send: sendSubscriptionControl,
+  });
+
   const link: TRPCLink<Router> = () => {
     return ({ op }) =>
       observable((observer) => {
@@ -124,20 +169,12 @@ export function createClient<TApi extends ApiContract = ApiContract>(
             if (cancelled) return;
 
             const id = String(nextId++);
-            pending.set(id, {
-              resolve: (value) => {
+            sendRequest(ws, requestForOperation(id, op))
+              .then((value) => {
                 observer.next({ result: { data: value } });
                 observer.complete();
-              },
-              reject: (error) => observer.error(error as never),
-            });
-
-            try {
-              sendClientRpcRequest(ws, requestForOperation(id, op));
-            } catch (error) {
-              pending.delete(id);
-              observer.error(error as never);
-            }
+              })
+              .catch((error) => observer.error(error as never));
           })
           .catch((error) => observer.error(error as never));
 
@@ -167,11 +204,7 @@ export function createClient<TApi extends ApiContract = ApiContract>(
       const [input] = args;
       return trpc.api.mutate<ApiOutput<TApi, TPath>>({ path, input });
     },
-    subscribe(listener) {
-      listeners.add(listener);
-      void open();
-      return () => listeners.delete(listener);
-    },
+    subscribe: (collection, listener) => subscriptions.subscribe(collection, listener),
     close() {
       socket?.close();
       socket = undefined;
@@ -215,63 +248,6 @@ export function acquireSharedClient<TApi extends ApiContract = ApiContract>(
       }
     },
   };
-}
-
-function takePending(pending: Map<string, PendingRequest>, id: RpcId): PendingRequest | undefined {
-  if (id === null || id === undefined) {
-    return undefined;
-  }
-
-  const key = String(id);
-  const request = pending.get(key);
-  pending.delete(key);
-  return request;
-}
-
-function requestForOperation(
-  id: string,
-  op: { type: string; path: string; input: unknown },
-): ClientRpcRequest {
-  if (op.type === "mutation" && op.path === "push") {
-    return {
-      id,
-      method: "mutation",
-      params: {
-        path: "push",
-        input: {
-          json: op.input as Batch,
-        },
-      },
-    };
-  }
-
-  if (op.type === "query" && op.path === "read") {
-    return {
-      id,
-      method: "query",
-      params: {
-        path: "read",
-        input: {
-          json: op.input as ReadQuery,
-        },
-      },
-    };
-  }
-
-  if (op.type === "mutation" && op.path === "api") {
-    return {
-      id,
-      method: "mutation",
-      params: {
-        path: "api",
-        input: {
-          json: op.input as ApiCall,
-        },
-      },
-    };
-  }
-
-  throw new Error(`Unsupported operation: ${op.type}.${op.path}`);
 }
 
 function sharedClientKey(options: ClientOptions): string {

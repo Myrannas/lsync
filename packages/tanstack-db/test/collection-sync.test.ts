@@ -17,6 +17,80 @@ const todoSchema = z.object({
 });
 
 describe("collectionOptions sync", () => {
+  it("subscribes to the collection scope and unsubscribes during cleanup", () => {
+    const subscriptions: Array<string> = [];
+    let unsubscribed = false;
+    const client: Client = {
+      clientId: "client-1",
+      push: async (batch) => ({ accepted: batch.updates.length }),
+      read: async () => ({ rows: [] }),
+      call: async () => undefined,
+      subscribe: (collection) => {
+        subscriptions.push(collection);
+        return {
+          ready: Promise.resolve(),
+          unsubscribe: () => {
+            unsubscribed = true;
+          },
+        };
+      },
+      close: () => {},
+    };
+    const options = collectionOptions({
+      id: "issues",
+      collection: "/projects/p1/issues/",
+      client,
+      getKey: (todo: Todo) => todo.id,
+      schema: todoSchema,
+      read: false,
+    });
+    const cleanup = options.sync.sync(syncContext()) as () => void;
+
+    expect(subscriptions).toEqual(["/projects/p1/issues/"]);
+    cleanup();
+    expect(unsubscribed).toBe(true);
+  });
+
+  it("waits for the collection subscription before the initial read", async () => {
+    const calls: Array<string> = [];
+    let ready!: () => void;
+    const client: Client = {
+      clientId: "client-1",
+      push: async (batch) => ({ accepted: batch.updates.length }),
+      read: async () => {
+        calls.push("read");
+        return { rows: [] };
+      },
+      call: async () => undefined,
+      subscribe: () => ({
+        ready: new Promise((resolve) => {
+          ready = () => {
+            calls.push("ready");
+            resolve();
+          };
+        }),
+        unsubscribe: () => {},
+      }),
+      close: () => {},
+    };
+    const options = collectionOptions({
+      id: "todos",
+      collection: "todos",
+      client,
+      getKey: (todo: Todo) => todo.id,
+      schema: todoSchema,
+    });
+
+    options.sync.sync(syncContext());
+    await Promise.resolve();
+    expect(calls).toEqual([]);
+
+    ready();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(calls).toEqual(["ready", "read"]);
+  });
+
   it("applies own on-demand broadcasts after a row leaves the active subset", async () => {
     let listener: ((broadcast: Broadcast) => void) | undefined;
     const rows = new Map<string, Todo>();
@@ -28,9 +102,12 @@ describe("collectionOptions sync", () => {
         rows: [{ id: "1", text: "Write tests", completed: false }],
       }),
       call: async () => undefined,
-      subscribe: (next) => {
+      subscribe: (_collection, next) => {
         listener = next;
-        return () => {};
+        return {
+          ready: Promise.resolve(),
+          unsubscribe: () => {},
+        };
       },
       close: () => {},
     };
@@ -99,6 +176,20 @@ describe("collectionOptions sync", () => {
     ]);
   });
 });
+
+function syncContext() {
+  return {
+    begin: () => {},
+    write: () => {},
+    commit: () => {},
+    markReady: () => {},
+    truncate: () => {},
+    collection: {
+      has: () => false,
+      get: () => undefined,
+    },
+  } as never;
+}
 
 function completedEquals(value: boolean): LoadSubsetOptions["where"] {
   return {
