@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { startManagedProcess, type ManagedProcess } from "../src/processes";
-import { processOutput, waitFor, waitForHttpOk, waitForHttpStatus } from "../src/readiness";
+import { processOutput, waitFor, waitForHttpOk } from "../src/readiness";
 import { openSyncClient } from "../src/sync-client";
 
 const workspaceRoot = new URL("../../..", import.meta.url).pathname;
@@ -11,9 +11,10 @@ const workerPort = Number(process.env.E2E_WORKER_PORT ?? 18_787);
 const frontendPort = Number(process.env.E2E_FRONTEND_PORT ?? 15_173);
 const shardId = `e2e-${Date.now()}`;
 const workerUrl = `ws://127.0.0.1:${workerPort}`;
-const workerHttpUrl = `http://127.0.0.1:${workerPort}/`;
+const workerHealthUrl = `http://127.0.0.1:${workerPort}/__e2e/health`;
 const syncUrl = `${workerUrl}/sync/${encodeURIComponent(shardId)}?clientId=e2e`;
 const frontendUrl = `http://127.0.0.1:${frontendPort}/?shard=${encodeURIComponent(shardId)}`;
+const configuredCollections = ["/todos/", "/users/"];
 
 const processes: Array<ManagedProcess> = [];
 let frontendHtml = "";
@@ -86,7 +87,7 @@ async function startExampleStack(): Promise<void> {
     }),
   );
 
-  await waitForHttpStatus(workerHttpUrl, 404, { timeoutMs: 20_000 });
+  await waitForWorkerHttpHealth();
   await waitForConfiguredSyncWorker();
 
   processes.push(
@@ -114,6 +115,20 @@ async function startExampleStack(): Promise<void> {
   frontendHtml = await waitForHttpOk(frontendUrl, { timeoutMs: 20_000 });
 }
 
+async function waitForWorkerHttpHealth(): Promise<void> {
+  await waitFor(
+    async () => {
+      const health = JSON.parse(await waitForHttpOk(workerHealthUrl, { timeoutMs: 1_000 })) as {
+        collections: Array<string>;
+      };
+
+      expect(health.collections).toEqual(configuredCollections);
+    },
+    "Worker HTTP health readiness timed out",
+    { timeoutMs: 20_000 },
+  );
+}
+
 async function waitForConfiguredSyncWorker(): Promise<void> {
   await waitFor(
     async () => {
@@ -122,10 +137,7 @@ async function waitForConfiguredSyncWorker(): Promise<void> {
       const client = await openSyncClient(probeUrl);
 
       try {
-        const user = await client.readUser("current-user");
-        if (user?.name !== "Current user") {
-          throw new Error("Expected initial current-user row from configured worker");
-        }
+        await expect(client.health()).resolves.toEqual({ collections: configuredCollections });
       } finally {
         client.close();
       }
