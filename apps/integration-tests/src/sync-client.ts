@@ -27,7 +27,7 @@ export interface TodoRow {
 
 export interface SyncClient {
   health(): Promise<{ collections: Array<string> }>;
-  pushTodo(todo: TodoRow): Promise<{ accepted: number }>;
+  pushTodo(todo: TodoRow): Promise<{ accepted: number; watermark: number }>;
   readTodo(id: string): Promise<TodoRow | undefined>;
   close(): void;
 }

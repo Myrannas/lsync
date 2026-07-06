@@ -33,15 +33,13 @@ export function persistSQLiteJsonBatchWithHistory(
   ensureSQLiteJsonTables(sql, collections);
   ensureChangesTable(sql);
 
-  return transaction(sql, () => {
-    applySQLiteJsonBatch(sql, batch, collections);
+  applySQLiteJsonBatch(sql, batch, collections);
 
-    const updates = batch.updates.map((update) => appendChange(sql, update, collections));
-    const watermark = updates.at(-1)?.sequence ?? readWatermark(sql);
-    pruneChanges(sql, watermark, options.maxChanges ?? 10000);
+  const updates = batch.updates.map((update) => appendChange(sql, update, collections));
+  const watermark = updates.at(-1)?.sequence ?? readWatermark(sql);
+  pruneChanges(sql, watermark, options.maxChanges ?? 10000);
 
-    return { updates, watermark };
-  });
+  return { updates, watermark };
 }
 
 export function readSQLiteJsonChanges(
@@ -257,18 +255,6 @@ function scopeForCollection(collection: string, collections: CollectionConfigs):
   }
 
   return collectionScope(collection);
-}
-
-function transaction<T>(sql: SqlStorageLike, callback: () => T): T {
-  sql.exec("BEGIN TRANSACTION");
-  try {
-    const result = callback();
-    sql.exec("COMMIT");
-    return result;
-  } catch (error) {
-    sql.exec("ROLLBACK");
-    throw error;
-  }
 }
 
 function quoteIdentifier(identifier: string): string {

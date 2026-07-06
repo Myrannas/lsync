@@ -148,11 +148,13 @@ export class CollectionShardDurableObject<
   }
 
   protected persist(batch: Batch): SequencedBatch {
-    return persistSQLiteJsonBatchWithHistory(
-      this.state.storage.sql,
-      batch,
-      this.options.collections,
-      this.options.history,
+    return this.state.storage.transactionSync(() =>
+      persistSQLiteJsonBatchWithHistory(
+        this.state.storage.sql,
+        batch,
+        this.options.collections,
+        this.options.history,
+      ),
     );
   }
 

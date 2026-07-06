@@ -138,6 +138,7 @@ function setup(
     },
     storage: {
       sql: new FakeSql(),
+      transactionSync: (callback: () => unknown) => callback(),
     },
     getWebSockets: () => sockets as never,
   };
