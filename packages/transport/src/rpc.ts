@@ -1,3 +1,4 @@
+import { decode, encode } from "@msgpack/msgpack";
 import { z } from "zod";
 import {
   apiCallSchema,
@@ -115,29 +116,35 @@ export type RpcErrorMessage = z.output<typeof rpcErrorMessageSchema>;
 export type SubscriptionMessage = z.output<typeof subscriptionMessageSchema>;
 export type ServerMessage = z.output<typeof serverMessageSchema>;
 
+export type TransportPayload = ArrayBuffer | ArrayBufferView | string;
+
 export interface TransportSocket {
-  send(data: string): void;
+  send(data: ArrayBuffer): void;
 }
 
-export function parseClientRpcRequest(data: ArrayBuffer | string): ParsedClientRpcRequest {
-  return clientRpcRequestSchema.parse(parseJson(data));
+export function parseClientRpcRequest(data: TransportPayload): ParsedClientRpcRequest {
+  return clientRpcRequestSchema.parse(decodeMessage(data));
 }
 
-export function parseServerMessage(data: ArrayBuffer | string): ServerMessage {
-  return serverMessageSchema.parse(parseJson(data));
+export function parseServerMessage(data: TransportPayload): ServerMessage {
+  return serverMessageSchema.parse(decodeMessage(data));
 }
 
-export function readRpcId(data: ArrayBuffer | string): RpcId {
-  const message = z.object({ id: rpcIdSchema }).safeParse(parseJson(data));
-  return message.success ? message.data.id : null;
+export function readRpcId(data: TransportPayload): RpcId {
+  try {
+    const message = z.object({ id: rpcIdSchema }).safeParse(decodeMessage(data));
+    return message.success ? message.data.id : null;
+  } catch {
+    return null;
+  }
 }
 
-export function encodeClientRpcRequest(message: ClientRpcRequest): string {
-  return JSON.stringify(message);
+export function encodeClientRpcRequest(message: ClientRpcRequest): ArrayBuffer {
+  return encodeMessage(message);
 }
 
-export function encodeServerMessage(message: ServerMessage): string {
-  return JSON.stringify(message);
+export function encodeServerMessage(message: ServerMessage): ArrayBuffer {
+  return encodeMessage(message);
 }
 
 export function sendClientRpcRequest(socket: TransportSocket, message: ClientRpcRequest): void {
@@ -148,7 +155,17 @@ export function sendServerMessage(socket: TransportSocket, message: ServerMessag
   socket.send(encodeServerMessage(message));
 }
 
-function parseJson(data: ArrayBuffer | string): unknown {
-  const text = typeof data === "string" ? data : new TextDecoder().decode(data);
-  return JSON.parse(text);
+function decodeMessage(data: TransportPayload): unknown {
+  if (typeof data === "string") {
+    return decode(new TextEncoder().encode(data));
+  }
+
+  return decode(data);
+}
+
+function encodeMessage(message: unknown): ArrayBuffer {
+  const bytes = encode(message);
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }

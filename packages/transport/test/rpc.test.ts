@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vite-plus/test";
 import { webSocketAttachmentSchema } from "../src/api";
-import { parseClientRpcRequest } from "../src/rpc";
+import {
+  encodeClientRpcRequest,
+  encodeServerMessage,
+  parseClientRpcRequest,
+  parseServerMessage,
+  readRpcId,
+} from "../src/rpc";
 
 describe("parseClientRpcRequest", () => {
   it("accepts custom API calls", () => {
     const request = parseClientRpcRequest(
-      JSON.stringify({
+      encodeClientRpcRequest({
         id: "1",
         method: "mutation",
         params: {
@@ -38,7 +44,7 @@ describe("parseClientRpcRequest", () => {
   it("accepts collection subscription controls", () => {
     expect(
       parseClientRpcRequest(
-        JSON.stringify({
+        encodeClientRpcRequest({
           id: "2",
           method: "subscribe",
           params: {
@@ -64,7 +70,7 @@ describe("parseClientRpcRequest", () => {
 
     expect(
       parseClientRpcRequest(
-        JSON.stringify({
+        encodeClientRpcRequest({
           id: "3",
           method: "unsubscribe",
           params: {
@@ -87,6 +93,33 @@ describe("parseClientRpcRequest", () => {
         },
       },
     });
+  });
+
+  it("round trips server messages as messagepack bytes", () => {
+    const bytes = encodeServerMessage({
+      id: "4",
+      result: {
+        type: "data",
+        data: {
+          json: { accepted: 1 },
+        },
+      },
+    });
+
+    expect(bytes).toBeInstanceOf(ArrayBuffer);
+    expect(parseServerMessage(bytes)).toEqual({
+      id: "4",
+      result: {
+        type: "data",
+        data: {
+          json: { accepted: 1 },
+        },
+      },
+    });
+  });
+
+  it("returns null when reading an id from a malformed frame", () => {
+    expect(readRpcId("not messagepack")).toBeNull();
   });
 });
 

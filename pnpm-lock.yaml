@@ -9,6 +9,9 @@ catalogs:
     '@cloudflare/workers-types':
       specifier: ^5.20260705.1
       version: 5.20260705.1
+    '@msgpack/msgpack':
+      specifier: ^3.1.3
+      version: 3.1.3
     '@standard-schema/spec':
       specifier: ^1.0.0
       version: 1.1.0
@@ -234,6 +237,9 @@ importers:
 
   packages/transport:
     dependencies:
+      '@msgpack/msgpack':
+        specifier: 'catalog:'
+        version: 3.1.3
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -766,6 +772,10 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@msgpack/msgpack@3.1.3':
+    resolution: {integrity: sha512-47XIizs9XZXvuJgoaJUIE2lFoID8ugvc0jzSHP+Ptfk8nTbnR8g788wv48N03Kx0UkAv559HWRQ3yzOgzlRNUA==}
+    engines: {node: '>= 18'}
 
   '@oxc-project/runtime@0.138.0':
     resolution: {integrity: sha512-yHhoXsN8tYxgdJCdD91PbySNjEEaBX/tH2OQRDXJpsQv5b184oC4/qVbU7qlblvfil/JP15Lh2HW7+HN5DS90Q==}
@@ -3072,6 +3082,8 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@msgpack/msgpack@3.1.3': {}
 
   '@oxc-project/runtime@0.138.0': {}
 
