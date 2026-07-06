@@ -1,6 +1,7 @@
 import { parseClientRpcRequest, readRpcId, sendServerMessage } from "lsync-transport";
 import { authorizeReadQuery, visibleUpdateForAuth } from "./access";
 import { normalizeCollection } from "./collection-normalize";
+import { DurableObject } from "cloudflare:workers";
 import { callRouter } from "./durable-object-rpc";
 import { sendRpcError, sendRpcResult } from "./messages";
 import { router } from "./router";
@@ -31,10 +32,7 @@ import {
   type HistoryOptions,
 } from "./history";
 import { validateBatch } from "./validation";
-
-export interface Env {
-  SYNC_SHARDS: DurableObjectNamespace;
-}
+import type { Env } from "./worker";
 
 export interface CollectionShardOptions<TApi extends ApiContract = ApiContract> {
   collections?: CollectionConfigs;
@@ -45,14 +43,16 @@ export interface CollectionShardOptions<TApi extends ApiContract = ApiContract> 
 
 export class CollectionShardDurableObject<
   TApi extends ApiContract = ApiContract,
-> implements DurableObject {
+> extends DurableObject<Env> {
   constructor(
-    private readonly state: DurableObjectState,
-    private readonly env: Env,
+    ctx: DurableObjectState,
+    env: Env,
     private readonly options: CollectionShardOptions<TApi> = {},
-  ) {}
+  ) {
+    super(ctx, env);
+  }
 
-  async fetch(request: Request): Promise<Response> {
+  async acceptWebSocket(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("Expected WebSocket upgrade", { status: 426 });
     }
@@ -65,7 +65,7 @@ export class CollectionShardDurableObject<
     const clientId = url.searchParams.get("clientId") ?? crypto.randomUUID();
     const auth = (await this.options.authenticate?.({ clientId, request })) ?? { clientId };
 
-    this.state.acceptWebSocket(server);
+    this.ctx.acceptWebSocket(server);
     server.serializeAttachment({
       clientId,
       connectedAt: Date.now(),
@@ -122,7 +122,7 @@ export class CollectionShardDurableObject<
       },
     } as const;
 
-    for (const socket of this.state.getWebSockets()) {
+    for (const socket of this.ctx.getWebSockets()) {
       const updates = this.subscribedUpdates(socket, batch);
       if (updates.length === 0) {
         continue;
@@ -148,9 +148,9 @@ export class CollectionShardDurableObject<
   }
 
   protected persist(batch: Batch): SequencedBatch {
-    return this.state.storage.transactionSync(() =>
+    return this.ctx.storage.transactionSync(() =>
       persistSQLiteJsonBatchWithHistory(
-        this.state.storage.sql,
+        this.ctx.storage.sql,
         batch,
         this.options.collections,
         this.options.history,
@@ -164,11 +164,11 @@ export class CollectionShardDurableObject<
       return { rows: [] };
     }
 
-    return readSQLiteJsonRows(this.state.storage.sql, authorized, this.options.collections);
+    return readSQLiteJsonRows(this.ctx.storage.sql, authorized, this.options.collections);
   }
 
   protected readChanges(query: SyncChangesQuery, auth: AccessAuth = {}): SyncChangesResult {
-    const result = readSQLiteJsonChanges(this.state.storage.sql, query, this.options.collections);
+    const result = readSQLiteJsonChanges(this.ctx.storage.sql, query, this.options.collections);
     if (result.type === "resyncRequired") {
       return result;
     }
@@ -294,6 +294,6 @@ export class CollectionShardDurableObject<
   }
 
   private shardId(): string {
-    return this.state.id.toString();
+    return this.ctx.id.toString();
   }
 }

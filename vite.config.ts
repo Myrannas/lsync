@@ -3,6 +3,10 @@ import { defineConfig } from "vite-plus";
 export default defineConfig({
   resolve: {
     alias: {
+      "cloudflare:workers": new URL(
+        "./packages/server/test/cloudflare-workers-test-shim.ts",
+        import.meta.url,
+      ).pathname,
       "lsync-server/client": new URL("./packages/server/src/client.ts", import.meta.url).pathname,
       "lsync-server": new URL("./packages/server/src/index.ts", import.meta.url).pathname,
       "lsync-tanstack-db": new URL("./packages/tanstack-db/src/index.ts", import.meta.url).pathname,
