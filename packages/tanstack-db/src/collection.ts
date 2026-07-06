@@ -1,4 +1,9 @@
-import type { CollectionConfig, InferSchemaOutput, LoadSubsetOptions } from "@tanstack/db";
+import type {
+  CollectionConfig,
+  InferSchemaOutput,
+  LoadSubsetOptions,
+  TransactionWithMutations,
+} from "@tanstack/db";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { createBatch, toChangeMessage } from "./batch";
 import { acquireSharedClient } from "./client";
@@ -32,6 +37,7 @@ export function collectionOptions<
 >(options: CollectionOptions<T, TKey, TSchema>): CollectionConfig<T, TKey, TSchema> {
   let lease: ReturnType<typeof acquireSharedClient> | undefined;
   let client = options.client;
+  let activeSubsets: SubsetTracker<T, TKey> | undefined;
 
   if (!client) {
     if (!options.url) {
@@ -59,6 +65,7 @@ export function collectionOptions<
     sync: {
       sync: ({ begin, write, commit, markReady, collection }) => {
         const subsets = new SubsetTracker<T, TKey>(options.getKey);
+        activeSubsets = subsets;
         const subsetGcTime = options.gcTime ?? 300000;
         const retentionTimers = new Map<string, ReturnType<typeof setTimeout>>();
         const deleteKeys = (keys: Array<TKey>) => {
@@ -97,19 +104,22 @@ export function collectionOptions<
           );
         };
         const unsubscribe = client.subscribe((broadcast) => {
-          const updates = broadcast.updates.filter((update) => {
-            if (update.collection !== options.collection) return false;
-            if ((options.ignoreOwnUpdates ?? true) && update.clientId === client.clientId) {
-              return false;
+          const changes = broadcast.updates.flatMap((update) => {
+            if (update.collection !== options.collection) return [];
+            const ownUpdate = update.clientId === client.clientId;
+            if ((options.ignoreOwnUpdates ?? false) && ownUpdate) {
+              return [];
             }
 
             if (options.syncMode !== "on-demand") {
-              return true;
+              return [toChangeMessage<T, TKey>(update, collection.has(update.key as TKey))];
             }
 
             const key = update.key as TKey;
+            const exists = collection.has(key);
             if (update.type === "delete") {
-              return subsets.deleteKey(key);
+              subsets.deleteKey(key);
+              return exists ? [{ type: "delete" as const, key }] : [];
             }
 
             const current = collection.get(key) as T | undefined;
@@ -117,16 +127,22 @@ export function collectionOptions<
               update.type === "update" && current
                 ? ({ ...current, ...(update.value as Partial<T>) } as T)
                 : (update.value as T);
-            return subsets.trackRow(row);
+            const tracked = subsets.reconcileRow(row);
+
+            if (ownUpdate || exists || tracked.after) {
+              return [toChangeMessage<T, TKey>(update, exists)];
+            }
+
+            return [];
           });
 
-          if (updates.length === 0) {
+          if (changes.length === 0) {
             return;
           }
 
           begin();
-          for (const update of updates) {
-            write(toChangeMessage<T, TKey>(update));
+          for (const change of changes) {
+            write(change);
           }
           commit();
         });
@@ -181,6 +197,9 @@ export function collectionOptions<
               });
               retentionTimers.clear();
               subsets.clear();
+              if (activeSubsets === subsets) {
+                activeSubsets = undefined;
+              }
               unsubscribe();
               lease?.release();
             },
@@ -202,17 +221,45 @@ export function collectionOptions<
         }
 
         return () => {
+          if (activeSubsets === subsets) {
+            activeSubsets = undefined;
+          }
           unsubscribe();
           lease?.release();
         };
       },
       rowUpdateMode: "partial",
     },
-    onInsert: async ({ transaction }) =>
-      client.push(createBatch(options.collection, client.clientId, transaction)),
-    onUpdate: async ({ transaction }) =>
-      client.push(createBatch(options.collection, client.clientId, transaction)),
-    onDelete: async ({ transaction }) =>
-      client.push(createBatch(options.collection, client.clientId, transaction)),
+    onInsert: async ({ transaction }) => {
+      trackLocalTransaction(activeSubsets, options.syncMode, transaction);
+      return client.push(createBatch(options.collection, client.clientId, transaction));
+    },
+    onUpdate: async ({ transaction }) => {
+      trackLocalTransaction(activeSubsets, options.syncMode, transaction);
+      return client.push(createBatch(options.collection, client.clientId, transaction));
+    },
+    onDelete: async ({ transaction }) => {
+      trackLocalTransaction(activeSubsets, options.syncMode, transaction);
+      return client.push(createBatch(options.collection, client.clientId, transaction));
+    },
   } as CollectionConfig<T, TKey, TSchema>;
+}
+
+function trackLocalTransaction<T extends object, TKey extends string | number>(
+  subsets: SubsetTracker<T, TKey> | undefined,
+  syncMode: CollectionConfig<T, TKey>["syncMode"],
+  transaction: Pick<TransactionWithMutations<T>, "mutations">,
+): void {
+  if (syncMode !== "on-demand" || !subsets) {
+    return;
+  }
+
+  for (const mutation of transaction.mutations) {
+    if (mutation.type === "delete") {
+      subsets.deleteKey(mutation.key as TKey);
+      continue;
+    }
+
+    subsets.reconcileRow(mutation.modified as T);
+  }
 }

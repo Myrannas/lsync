@@ -55,6 +55,7 @@ function toUpdate<T extends object>(
 
 export function toChangeMessage<T extends object, TKey extends string | number>(
   update: Update,
+  existing?: boolean,
 ): ChangeMessageOrDeleteKeyMessage<T, TKey> {
   if (update.type === "delete") {
     return {
@@ -63,8 +64,15 @@ export function toChangeMessage<T extends object, TKey extends string | number>(
     } as ChangeMessageOrDeleteKeyMessage<T, TKey>;
   }
 
+  const type =
+    update.type === "update" && existing === false
+      ? "insert"
+      : update.type === "insert" && existing === true
+        ? "update"
+        : update.type;
+
   return {
-    type: update.type,
+    type,
     key: update.key as TKey,
     value: update.value as T,
   } as ChangeMessageOrDeleteKeyMessage<T, TKey>;

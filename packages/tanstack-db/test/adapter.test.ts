@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { collectionOptions, createBatch, createClient } from "../src/index";
+import { collectionOptions, createBatch, createClient, toChangeMessage } from "../src/index";
 import { acquireSharedClient } from "../src/client";
 import { BasicIndex } from "@tanstack/db";
 import type { PendingMutation, TransactionWithMutations } from "@tanstack/db";
@@ -209,5 +209,47 @@ describe("createBatch", () => {
       previousValue: { id: "1", text: "Remove me", completed: false },
     });
     expect(result.updates[0]).not.toHaveProperty("value");
+  });
+});
+
+describe("toChangeMessage", () => {
+  it("converts remote updates for missing local rows into inserts", () => {
+    expect(
+      toChangeMessage<Todo, string>(
+        {
+          id: "m4",
+          collection: "todos",
+          key: "1",
+          type: "update",
+          value: { id: "1", text: "Now visible", completed: true },
+          createdAt: 4,
+        },
+        false,
+      ),
+    ).toEqual({
+      type: "insert",
+      key: "1",
+      value: { id: "1", text: "Now visible", completed: true },
+    });
+  });
+
+  it("converts remote inserts for existing local rows into updates", () => {
+    expect(
+      toChangeMessage<Todo, string>(
+        {
+          id: "m5",
+          collection: "todos",
+          key: "1",
+          type: "insert",
+          value: { id: "1", text: "Already here", completed: false },
+          createdAt: 5,
+        },
+        true,
+      ),
+    ).toEqual({
+      type: "update",
+      key: "1",
+      value: { id: "1", text: "Already here", completed: false },
+    });
   });
 });

@@ -4,6 +4,7 @@ import type {
   SQLiteJsonIndexConfig,
   SQLiteJsonStorageConfig,
 } from "./types";
+import { collectionScope, resolveCollection } from "./collections";
 
 export { readSQLiteJsonRows } from "./sqlite-json-read";
 
@@ -47,12 +48,13 @@ export function ensureSQLiteJsonTables(
     const table = tableName(collectionName, collection.storage);
     const result = sql.exec(`
       CREATE TABLE IF NOT EXISTS ${quoteIdentifier(table)} (
-        key TEXT PRIMARY KEY,
+        key TEXT NOT NULL,
         path TEXT NOT NULL,
         value TEXT NOT NULL,
         version INTEGER NOT NULL,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (path, key)
       )
     `);
 
@@ -65,7 +67,7 @@ export function ensureSQLiteJsonTables(
         const insertSql = `INSERT INTO ${quoteIdentifier(table)} (key, path, value, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`;
         for (const data of collection.initialData) {
           const key = String(data.id);
-          const path = "";
+          const path = collectionScope(collectionName);
           const value = JSON.stringify(data);
           const version = 1;
           const createdAt = new Date().toISOString();
@@ -85,17 +87,22 @@ export function applySQLiteJsonBatch(
   ensureSQLiteJsonTables(sql, collections);
 
   for (const update of batch.updates) {
-    const collection = collections[update.collection];
-    if (collection?.storage?.kind !== "sqlite-json") {
+    const resolved = resolveCollection(update.collection, collections);
+
+    if (resolved?.collection.storage?.kind !== "sqlite-json") {
       continue;
     }
 
-    const table = tableName(update.collection, collection.storage);
+    const table = tableName(resolved.name, resolved.collection.storage);
     const key = String(update.key);
+    const scope = resolved.scope;
     const updatedAt = new Date(update.createdAt).toISOString();
 
     if (update.type === "delete") {
-      sql.exec(`DELETE FROM ${quoteIdentifier(table)} WHERE key = ?`, key);
+      sql.exec(
+        `DELETE FROM ${quoteIdentifier(table)} WHERE ${whereKeySql()}`,
+        ...keyBindings(scope, key),
+      );
       continue;
     }
 
@@ -104,14 +111,14 @@ export function applySQLiteJsonBatch(
         `
           INSERT INTO ${quoteIdentifier(table)} (key, path, value, version, created_at, updated_at)
           VALUES (?, ?, ?, 1, ?, ?)
-          ON CONFLICT(key) DO UPDATE SET
+          ON CONFLICT(path, key) DO UPDATE SET
             path = excluded.path,
             value = excluded.value,
             version = ${quoteIdentifier(table)}.version + 1,
             updated_at = excluded.updated_at
         `,
         key,
-        update.path ?? "",
+        scope,
         stringifyRow(update.value),
         updatedAt,
         updatedAt,
@@ -120,7 +127,10 @@ export function applySQLiteJsonBatch(
     }
 
     const existing = sql
-      .exec<{ value: string }>(`SELECT value FROM ${quoteIdentifier(table)} WHERE key = ?`, key)
+      .exec<{ value: string }>(
+        `SELECT value FROM ${quoteIdentifier(table)} WHERE ${whereKeySql()}`,
+        ...keyBindings(scope, key),
+      )
       .toArray()[0];
 
     if (!existing) {
@@ -132,13 +142,21 @@ export function applySQLiteJsonBatch(
       `
         UPDATE ${quoteIdentifier(table)}
         SET value = ?, version = version + 1, updated_at = ?
-        WHERE key = ?
+        WHERE ${whereKeySql()}
       `,
       JSON.stringify(merged),
       updatedAt,
-      key,
+      ...keyBindings(scope, key),
     );
   }
+}
+
+function whereKeySql(): string {
+  return "path = ? AND key = ?";
+}
+
+function keyBindings(scope: string, key: string): Array<string> {
+  return [scope, key];
 }
 
 function tableName(collectionName: string, storage: SQLiteJsonStorageConfig): string {

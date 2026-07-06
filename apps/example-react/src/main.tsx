@@ -1,6 +1,6 @@
-import { BasicIndex, createCollection, eq } from "@tanstack/db";
+import { BasicIndex, eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
-import { collectionOptions } from "lsync-tanstack-db";
+import { createCollectionType } from "lsync-tanstack-db";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { z } from "zod";
@@ -32,32 +32,26 @@ const shardId = new URLSearchParams(window.location.search).get("shard") ?? "dem
 const workerUrl = import.meta.env.VITE_SYNC_URL ?? "ws://localhost:8787";
 const syncUrl = `${workerUrl.replace(/\/$/, "")}/sync/${encodeURIComponent(shardId)}`;
 
-const users = createCollection(
-  collectionOptions({
-    id: "users",
-    collection: "users",
-    url: syncUrl,
-    schema: z.object({
-      id: z.string(),
-      name: z.string(),
-    }),
-    getKey: (user) => user.id,
-    syncMode: "on-demand",
-    autoIndex: "eager",
-    defaultIndexType: BasicIndex,
+const users = createCollectionType({
+  path: "/users/",
+  url: syncUrl,
+  schema: z.object({
+    id: z.string(),
+    name: z.string(),
   }),
-);
+  getKey: (user) => user.id,
+  syncMode: "on-demand",
+  autoIndex: "eager",
+  defaultIndexType: BasicIndex,
+});
 
-const todos = createCollection(
-  collectionOptions({
-    id: "todos",
-    collection: "todos",
-    url: syncUrl,
-    getKey: (todo: Todo) => todo.id,
-    schema: todoSchema,
-    syncMode: "on-demand",
-  }),
-);
+const todos = createCollectionType({
+  path: "/todos/",
+  url: syncUrl,
+  getKey: (todo: Todo) => todo.id,
+  schema: todoSchema,
+  syncMode: "on-demand",
+});
 
 function App() {
   const [text, setText] = useState("");
@@ -67,8 +61,8 @@ function App() {
   const { data } = useLiveQuery(
     (query) =>
       query
-        .from({ todo: todos })
-        .join({ user: users }, ({ user, todo }) => eq(user.id, todo.createdBy))
+        .from({ todo: todos.all() })
+        .join({ user: users.all() }, ({ user, todo }) => eq(user.id, todo.createdBy))
         .where(({ todo }) => eq(todo.completed, showCompleted))
         .orderBy(({ todo }) => todo.text)
         .select(({ user, todo }) => ({
@@ -155,9 +149,11 @@ function App() {
                 <Checkbox
                   id={`todo-${todo.id}`}
                   checked={todo.completed}
-                  onCheckedChange={() => {
+                  onCheckedChange={(checked) => {
+                    if (checked === "indeterminate") return;
+
                     todos.update(todo.id, (draft) => {
-                      draft.completed = !draft.completed;
+                      draft.completed = checked;
                     });
                   }}
                 />

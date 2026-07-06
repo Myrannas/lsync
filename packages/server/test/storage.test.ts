@@ -33,7 +33,7 @@ describe("sqliteJsonTable", () => {
       collections,
     );
 
-    expect(JSON.parse(sql.rows.get("1")!.value)).toEqual({
+    expect(JSON.parse(sql.rows.get("/todos/:1")!.value)).toEqual({
       id: "1",
       text: "Persist me",
       completed: false,
@@ -69,12 +69,12 @@ describe("sqliteJsonTable", () => {
       collections,
     );
 
-    expect(JSON.parse(sql.rows.get("1")!.value)).toEqual({
+    expect(JSON.parse(sql.rows.get("/todos/:1")!.value)).toEqual({
       id: "1",
       text: "Persist me",
       completed: true,
     });
-    expect(sql.rows.get("1")!.version).toBe(2);
+    expect(sql.rows.get("/todos/:1")!.version).toBe(2);
   });
 
   it("deletes stored JSON rows", () => {
@@ -105,7 +105,7 @@ describe("sqliteJsonTable", () => {
       collections,
     );
 
-    expect(sql.rows.has("1")).toBe(false);
+    expect(sql.rows.has("/todos/:1")).toBe(false);
   });
 
   it("rejects updates for missing rows", () => {
@@ -154,7 +154,6 @@ describe("sqliteJsonTable", () => {
       },
       collections,
     );
-
     const result = readSQLiteJsonRows(
       sql,
       {
@@ -168,7 +167,7 @@ describe("sqliteJsonTable", () => {
     expect(result.rows).toEqual([{ id: "1", text: "Done", completed: true }]);
     const statement = sql.statements.at(-1)!;
     expect(statement.query).toContain("json_extract(value, ?) = ?");
-    expect(statement.bindings).toEqual(["$.completed", 1, 10, 0]);
+    expect(statement.bindings).toEqual(["/todos/", "$.completed", 1, 10, 0]);
   });
 
   it("supports in filters for indexed JSON fields", () => {
@@ -220,7 +219,8 @@ describe("sqliteJsonTable", () => {
       { id: "1", text: "Alpha", completed: true },
       { id: "3", text: "Gamma", completed: false },
     ]);
-    expect(sql.statements.at(-1)!.bindings).toEqual(["$.text", "Alpha", "Gamma", 1000, 0]);
+    const bindings = ["/todos/", "$.text", "Alpha", "Gamma", 1000, 0];
+    expect(sql.statements.at(-1)!.bindings).toEqual(bindings);
   });
 
   it("orders reads by configured JSON fields", () => {
@@ -236,7 +236,7 @@ describe("sqliteJsonTable", () => {
     );
 
     expect(sql.statements.at(-1)!.query).toContain("ORDER BY json_extract(value, ?) DESC");
-    expect(sql.statements.at(-1)!.bindings).toEqual(["$.text", 1000, 0]);
+    expect(sql.statements.at(-1)!.bindings).toEqual(["/todos/", "$.text", 1000, 0]);
   });
 
   it("reads cursor predicates as current and from windows", () => {
@@ -275,6 +275,7 @@ describe("sqliteJsonTable", () => {
       "(json_extract(value, ?) > ? OR (json_extract(value, ?) = ? AND json_extract(value, ?) > ?))",
     );
     expect(fromQuery.bindings).toEqual([
+      "/todos/",
       "$.text",
       "Beta",
       "$.text",

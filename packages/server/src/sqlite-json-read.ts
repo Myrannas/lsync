@@ -7,6 +7,7 @@ import type {
   ReadResult,
   SQLiteJsonStorageConfig,
 } from "./types";
+import { resolveCollection } from "./collections";
 import { ensureSQLiteJsonTables, type SqlStorageLike, type SqlStorageValue } from "./storage";
 
 export function readSQLiteJsonRows(
@@ -16,8 +17,8 @@ export function readSQLiteJsonRows(
 ): ReadResult {
   ensureSQLiteJsonTables(sql, collections);
 
-  const collection = collections[query.collection];
-  if (!collection) {
+  const resolved = resolveCollection(query.collection, collections);
+  if (!resolved) {
     if (Object.keys(collections).length > 0) {
       throw new Error(`Unknown collection: ${query.collection}`);
     }
@@ -25,15 +26,16 @@ export function readSQLiteJsonRows(
     throw new Error(`Cannot read unconfigured collection: ${query.collection}`);
   }
 
-  if (collection.storage?.kind !== "sqlite-json") {
+  if (resolved.collection.storage?.kind !== "sqlite-json") {
     throw new Error(`Collection is not readable with SQLite JSON storage: ${query.collection}`);
   }
 
-  const table = tableName(query.collection, collection.storage);
+  const table = tableName(resolved.name, resolved.collection.storage);
   const filters = query.filters ?? [];
   const predicate = query.predicate;
   const orderBy = query.orderBy ?? [];
   const limit = query.limit ?? 1000;
+  const scope = { scope: resolved.scope };
 
   if (query.cursor) {
     const currentPredicate = combinePredicates(predicate, query.cursor.whereCurrent);
@@ -41,12 +43,14 @@ export function readSQLiteJsonRows(
     const currentRows = selectRows(sql, table, {
       filters,
       orderBy,
+      ...scope,
       ...(currentPredicate ? { predicate: currentPredicate } : {}),
     });
     const fromRows = selectRows(sql, table, {
       filters,
       limit,
       orderBy,
+      ...scope,
       ...(fromPredicate ? { predicate: fromPredicate } : {}),
     });
 
@@ -60,6 +64,7 @@ export function readSQLiteJsonRows(
     limit,
     offset: query.offset ?? 0,
     orderBy,
+    ...scope,
     ...(predicate ? { predicate } : {}),
   });
 
@@ -73,6 +78,7 @@ interface SelectRowsOptions {
   limit?: number;
   offset?: number;
   orderBy: Array<ReadOrderBy>;
+  scope: string;
   predicate?: ReadPredicate;
 }
 
@@ -82,7 +88,10 @@ function selectRows(
   options: SelectRowsOptions,
 ): Array<{ key: string; value: string }> {
   const bindings: Array<SqlStorageValue> = [];
-  const where = options.filters.map((filter) => filterSql(filter, bindings));
+  const where = ["path = ?"];
+  bindings.push(options.scope);
+
+  where.push(...options.filters.map((filter) => filterSql(filter, bindings)));
   if (options.predicate) {
     where.push(predicateSql(options.predicate, bindings));
   }
