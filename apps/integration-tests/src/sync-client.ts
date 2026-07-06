@@ -20,6 +20,7 @@ interface RpcFailure {
 type RpcResponse<T> = RpcSuccess<T> | RpcFailure;
 type BinaryMessage = ArrayBuffer | ArrayBufferView | Blob | string;
 const todosCollection = "/todos/";
+const requestTimeoutMs = 5_000;
 
 export interface TodoRow {
   id: string;
@@ -69,9 +70,19 @@ export async function openSyncClient(url: string): Promise<SyncClient> {
 function openWebSocket(url: string): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
+    const timeout = setTimeout(() => {
+      ws.close();
+      reject(new Error(`Timed out opening ${url}`));
+    }, requestTimeoutMs);
     ws.binaryType = "arraybuffer";
-    ws.addEventListener("open", () => resolve(ws));
-    ws.addEventListener("error", () => reject(new Error(`Unable to open ${url}`)));
+    ws.addEventListener("open", () => {
+      clearTimeout(timeout);
+      resolve(ws);
+    });
+    ws.addEventListener("error", () => {
+      clearTimeout(timeout);
+      reject(new Error(`Unable to open ${url}`));
+    });
   });
 }
 
@@ -84,10 +95,15 @@ function request<T>(ws: WebSocket, path: "api" | "push" | "read", input: unknown
   const method = path === "read" ? "query" : "mutation";
 
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      ws.removeEventListener("message", onMessage);
+      reject(new Error(`Timed out waiting for ${path} response`));
+    }, requestTimeoutMs);
     const onMessage = async (event: MessageEvent) => {
       const response = decodeMessage<T>(await messageData(event.data));
       if (response.id !== id) return;
 
+      clearTimeout(timeout);
       ws.removeEventListener("message", onMessage);
       if ("error" in response) {
         reject(new Error(response.error.message));
