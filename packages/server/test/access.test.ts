@@ -39,7 +39,7 @@ const store = {
   read: (_collection: string, _key: string | number) => undefined,
 };
 
-const parentStore = {
+const referenceStore = {
   read: (_collection: string, _key: string | number) => ({
     id: "p1",
     memberIds: ["u1"],
@@ -138,7 +138,7 @@ describe("read access", () => {
       "/projects/p1/todos/",
       referenceCollections,
       { orgId: "o1", userId: "u1" },
-      parentStore,
+      referenceStore,
     );
 
     expect(decision.allow).toBe(true);

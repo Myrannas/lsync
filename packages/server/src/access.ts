@@ -75,18 +75,18 @@ export function readAccessDecision(
   const access = resolved?.collection.access;
   if (!access?.read) return { allow: true, dependencies: [] };
 
-  const accessReferenceMap = accessReferences(collection, collections, auth);
-  const { references, row } = accessRows([...accessReferenceMap.keys()]);
+  const references = accessReferences(collection, collections, auth);
+  const rows = accessRows([...references.keys()]);
   const expression = access.read({
     auth,
     collection: resolved.scope,
-    references,
+    references: rows.references,
     params: resolved.params,
     pattern: resolved.name,
-    row,
+    row: rows.row,
   });
   const referenceValues = new Map(
-    [...accessReferenceMap].map(([name, reference]) => [
+    [...references].map(([name, reference]) => [
       name,
       {
         ...reference,
