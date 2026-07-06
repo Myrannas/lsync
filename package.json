@@ -6,6 +6,7 @@
   "scripts": {
     "dev:worker": "corepack pnpm --filter @lfsync/example-worker dev",
     "dev:react": "corepack pnpm --filter @lfsync/example-react dev",
+    "e2e": "vp test run --config apps/integration-tests/vite.config.ts apps/integration-tests/test/smoke.e2e.ts",
     "prepare": "vp config"
   },
   "devDependencies": {
