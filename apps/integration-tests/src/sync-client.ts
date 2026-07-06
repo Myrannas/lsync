@@ -39,7 +39,7 @@ export async function openSyncClient(url: string): Promise<SyncClient> {
   const ws = await openWebSocket(url);
 
   return {
-    health: () => callApi(ws, "health"),
+    health: () => callApi(ws, "todos.health"),
     pushTodo: (todo) =>
       request(ws, "push", {
         updates: [

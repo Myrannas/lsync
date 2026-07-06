@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
+import { Collections, collectionApiHandlers, defaultCollectionApiPath } from "../src";
 import { readSQLiteJsonRows } from "../src/sqlite-json-read";
 import { applySQLiteJsonBatch, sqliteJsonTable } from "../src/storage";
 import { validateBatch } from "../src/validation";
@@ -88,6 +89,165 @@ describe("hierarchical collections", () => {
     expect(select.query).toContain("WHERE path = ? AND json_extract(value, ?) = ?");
     expect(select.bindings).toEqual(["/projects/p1/issues/", "$.status", "open", 1000, 0]);
   });
+
+  it("uses SQLite JSON storage by default for configured collections", () => {
+    const sql = new RecordingSql();
+    const defaultStorageCollections: CollectionConfigs = {
+      "/todos/": {
+        schema: z.object({ id: z.string(), text: z.string() }),
+      },
+    };
+
+    applySQLiteJsonBatch(
+      sql,
+      {
+        updates: [
+          {
+            id: "m1",
+            collection: "/todos/",
+            key: "t1",
+            type: "insert",
+            value: { id: "t1", text: "Default storage" },
+            createdAt: Date.UTC(2026, 0, 1),
+          },
+        ],
+      },
+      defaultStorageCollections,
+    );
+
+    expect(sql.statements.some((statement) => statement.query.includes('"/todos/"'))).toBe(true);
+  });
+});
+
+describe("server collection builders", () => {
+  it("builds collection configs with derived root and child paths", () => {
+    const built = Collections.builder()
+      .collection("projects", (collection) =>
+        collection
+          .schema(z.object({ id: z.string(), name: z.string() }))
+          .storage(sqliteJsonTable({ tableName: "projects" }))
+          .child("issues", (child) =>
+            child
+              .schema(issueSchema)
+              .storage(sqliteJsonTable({ tableName: "issues" }))
+              .index("status"),
+          ),
+      )
+      .build();
+
+    expect(Object.keys(built).sort()).toEqual(["/projects/", "/projects/{projectId}/issues/"]);
+    expect(built["/projects/"]?.storage).toMatchObject({ tableName: "projects" });
+    expect(built["/projects/{projectId}/issues/"]?.storage).toMatchObject({
+      tableName: "issues",
+      indexes: [{ fields: ["status"] }],
+    });
+  });
+
+  it("uses SQLite JSON storage by default and configures indexes with helpers", () => {
+    const built = Collections.builder()
+      .collection("todos", (collection) =>
+        collection
+          .schema(z.object({ id: z.string(), completed: z.boolean(), ownerId: z.string() }))
+          .index("completed")
+          .index(["ownerId", "completed"])
+          .index({ name: "todos_owner_idx", fields: ["ownerId"] }),
+      )
+      .build();
+
+    expect(built["/todos/"]?.storage).toEqual({
+      kind: "sqlite-json",
+      indexes: [
+        { fields: ["completed"] },
+        { fields: ["ownerId", "completed"] },
+        { name: "todos_owner_idx", fields: ["ownerId"] },
+      ],
+    });
+  });
+
+  it("accepts initial data as varargs", () => {
+    const built = Collections.builder()
+      .collection("users", (collection) =>
+        collection
+          .schema(z.object({ id: z.string(), name: z.string() }))
+          .initialData({ id: "u1", name: "One" }, { id: "u2", name: "Two" }),
+      )
+      .build();
+
+    expect(built["/users/"]?.initialData).toEqual([
+      { id: "u1", name: "One" },
+      { id: "u2", name: "Two" },
+    ]);
+  });
+
+  it("derives collection-local API paths from collection paths", async () => {
+    const handlers = collectionApiHandlers(
+      Collections.builder()
+        .collection("todos", (collection) =>
+          collection
+            .schema(z.object({ id: z.string() }))
+            .api("completeAll", z.object({ scope: z.literal("open") }), ({ input }) => ({
+              accepted: true,
+              scope: input.scope,
+            })),
+        )
+        .build(),
+    );
+
+    await expect(
+      Promise.resolve(
+        handlers["todos.completeAll"]?.({
+          input: { scope: "open" },
+        } as never),
+      ),
+    ).resolves.toEqual({
+      accepted: true,
+      scope: "open",
+    });
+    expect(defaultCollectionApiPath("/projects/{projectId}/issues/", "close")).toBe(
+      "projects.issues.close",
+    );
+  });
+
+  it("validates collection API inputs before invoking handlers", async () => {
+    const handlers = collectionApiHandlers(
+      Collections.builder()
+        .collection("todos", (collection) =>
+          collection
+            .schema(z.object({ id: z.string() }))
+            .api("complete", z.object({ id: z.string() }), ({ input }) => ({ id: input.id })),
+        )
+        .build(),
+    );
+
+    await expect(
+      Promise.resolve().then(() => handlers["todos.complete"]?.({ input: { id: 1 } } as never)),
+    ).rejects.toThrow();
+  });
+
+  it("rejects duplicate collection API paths", () => {
+    expect(() =>
+      collectionApiHandlers({
+        todos: {
+          schema: z.object({ id: z.string() }),
+          api: {
+            health: {
+              input: z.undefined(),
+              handler: () => ({ ok: true }),
+            },
+          },
+        },
+        "/todos/": {
+          schema: z.object({ id: z.string() }),
+          api: {
+            health: {
+              input: z.undefined(),
+              handler: () => ({ ok: false }),
+            },
+          },
+        },
+      }),
+    ).toThrow("Duplicate API path: todos.health");
+  });
 });
 
 function issueBatch(collection: string, value: unknown): Batch {
@@ -122,3 +282,18 @@ class RecordingSql implements SqlStorageLike {
     return new EmptyCursor<T>();
   }
 }
+
+function assertIndexTypes(): void {
+  const users = Collections.collection()
+    .name("users")
+    .schema(z.object({ id: z.string(), name: z.string() }));
+
+  users.index("id");
+  users.index(["id", "name"]);
+  users.index({ name: "users_name_idx", fields: ["name"] });
+
+  // @ts-expect-error indexes must reference fields from the schema output
+  users.index("missing");
+}
+
+void assertIndexTypes;

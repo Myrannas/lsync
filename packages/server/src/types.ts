@@ -1,9 +1,5 @@
 import type { z } from "zod";
 import type {
-  ApiContract,
-  ApiInput,
-  ApiOutput,
-  ApiPath,
   Batch,
   CollectionSubscription,
   CollectionSubscriptionResult,
@@ -116,13 +112,14 @@ export interface CollectionConfig<T extends object = Record<string, unknown>> {
   access?: CollectionAccessConfig<T>;
   storage?: CollectionStorageConfig;
   initialData?: Array<Record<string, unknown>>;
+  api?: CollectionApiHandlers;
 }
 
 export type CollectionConfigs = Record<string, CollectionConfig>;
 
-export interface SQLiteJsonIndexConfig {
+export interface SQLiteJsonIndexConfig<TField extends string = string> {
   name?: string;
-  fields: Array<string>;
+  fields: Array<TField>;
 }
 
 export interface SQLiteJsonStorageConfig {
@@ -155,9 +152,15 @@ export type ApiHandler<TResult = unknown, TInput = unknown> = (
   args: ApiHandlerArgs<TInput>,
 ) => TResult | Promise<TResult>;
 
-export type ApiHandlers<TApi extends ApiContract = ApiContract> = {
-  [TPath in ApiPath<TApi>]: ApiHandler<ApiOutput<TApi, TPath>, ApiInput<TApi, TPath>>;
-};
+export interface CollectionApiDefinition<
+  TSchema extends z.ZodTypeAny = z.ZodTypeAny,
+  TResult = unknown,
+> {
+  input: TSchema;
+  handler: ApiHandler<TResult, z.output<TSchema>>;
+}
+
+export type CollectionApiHandlers = Record<string, CollectionApiDefinition<any, any>>;
 
 export interface SequencedBatch {
   updates: Array<SequencedUpdate>;

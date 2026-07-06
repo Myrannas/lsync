@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionConfigs } from "./types";
+import type { ApiHandler, CollectionConfig, CollectionConfigs } from "./types";
 
 export interface ResolvedCollection {
   name: string;
@@ -70,6 +70,38 @@ export function isCollectionPattern(collectionName: string): boolean {
   return collectionName.split("/").some((segment) => /^\{[A-Za-z_][A-Za-z0-9_]*\}$/.test(segment));
 }
 
+export function collectionApiHandlers(
+  collections: CollectionConfigs = {},
+): Record<string, ApiHandler> {
+  const handlers: Record<string, ApiHandler> = {};
+
+  for (const [collectionPath, collection] of Object.entries(collections)) {
+    for (const [name, definition] of Object.entries(collection.api ?? {})) {
+      const path = defaultCollectionApiPath(collectionPath, name);
+
+      if (handlers[path]) {
+        throw new Error(`Duplicate API path: ${path}`);
+      }
+
+      handlers[path] = (args) =>
+        definition.handler({
+          ...args,
+          input: definition.input.parse(args.input),
+        });
+    }
+  }
+
+  return handlers;
+}
+
+export function defaultCollectionApiPath(collectionPath: string, name: string): string {
+  const prefix = splitCollectionPath(collectionPath)
+    .filter((segment) => !collectionPathParamName(segment))
+    .join(".");
+
+  return prefix ? `${prefix}.${name}` : name;
+}
+
 function matchCollectionPattern(
   pattern: string,
   collectionName: string,
@@ -126,6 +158,13 @@ function splitCollectionPath(path: string): Array<string> {
   }
 
   return trimmed.split("/");
+}
+
+function collectionPathParamName(segment: string): string | undefined {
+  return (
+    segment.match(/^\{([A-Za-z_][A-Za-z0-9_]*)\}$/)?.[1] ??
+    segment.match(/^:([A-Za-z_][A-Za-z0-9_]*)$/)?.[1]
+  );
 }
 
 function normalizeSegment(segment: string): string {

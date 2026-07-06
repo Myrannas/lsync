@@ -1,8 +1,7 @@
 import {
   CollectionShardDurableObject,
+  Collections,
   createWorkerHandler,
-  sqliteJsonTable,
-  type CollectionConfigs,
   type Env,
 } from "lsync-server";
 import { z } from "zod";
@@ -14,40 +13,39 @@ const todoSchema = z.object({
   completed: z.boolean(),
 });
 
-const collections = {
-  "/todos/": {
-    schema: todoSchema,
-    storage: sqliteJsonTable({
-      indexes: [["completed"]],
-    }),
-  },
-  "/users/": {
-    schema: z.object({
-      id: z.string(),
-      name: z.string(),
-    }),
-    storage: sqliteJsonTable({
-      indexes: [["id"]],
-    }),
-    initialData: [
-      {
+const collectionNames = ["/todos/", "/users/"];
+
+const collections = Collections.builder()
+  .collection("todos", (collection) =>
+    collection
+      .schema(todoSchema)
+      .index("completed")
+      .api("health", z.undefined(), (): { collections: Array<string> } => ({
+        collections: collectionNames,
+      })),
+  )
+  .collection("users", (collection) =>
+    collection
+      .schema(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+        }),
+      )
+      .index("id")
+      .initialData({
         id: "current-user",
         name: "Current user",
-      },
-    ],
-  },
-} satisfies CollectionConfigs;
+      }),
+  )
+  .build();
 
-const collectionNames = Object.keys(collections).sort();
 const syncHandler = createWorkerHandler();
 
 export class CollectionShard extends CollectionShardDurableObject {
   constructor(state: DurableObjectState, env: Env) {
     super(state, env, {
       collections,
-      api: {
-        health: () => ({ collections: collectionNames }),
-      },
     });
   }
 }

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { eq } from "../src";
+import { eq, sqliteJsonTable } from "../src";
 import {
   fakeSocket,
   mixedBatch,
+  ownershipSeed,
   ownershipTransfer,
   parseMessage,
   projectNameChange,
@@ -58,12 +59,18 @@ describe("CollectionShardDurableObject subscriptions", () => {
             id: z.string(),
             ownerId: z.string(),
           }),
+          storage: sqliteJsonTable({ tableName: "todos" }),
           access: {
             read: ({ auth, row }) => eq(row.ownerId, auth.userId),
           },
         },
       },
     });
+
+    await object.webSocketMessage(pusher as never, rpc("seed", "push", ownershipSeed()));
+    for (const socket of [pusher, previousOwner, nextOwner]) {
+      socket.messages.length = 0;
+    }
 
     await object.webSocketMessage(pusher as never, rpc("1", "push", ownershipTransfer()));
 

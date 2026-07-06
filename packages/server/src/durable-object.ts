@@ -1,12 +1,10 @@
 import { parseClientRpcRequest, readRpcId, sendServerMessage } from "lsync-transport";
 import { authorizeReadQuery, visibleUpdateForAuth, type AccessStore } from "./access";
 import { normalizeCollection } from "./collection-normalize";
+import { collectionApiHandlers } from "./collections";
 import { callRouter } from "./durable-object-rpc";
-import {
-  persistSQLiteJsonBatchWithHistory,
-  readSQLiteJsonChanges,
-  type HistoryOptions,
-} from "./history";
+import type { CollectionShardOptions, Env } from "./durable-object-types";
+import { persistSQLiteJsonBatchWithHistory, readSQLiteJsonChanges } from "./history";
 import { sendRpcError, sendRpcResult } from "./messages";
 import { router } from "./router";
 import { updateSocketSubscriptions, webSocketAttachment, webSocketAuth } from "./socket-attachment";
@@ -15,14 +13,12 @@ import { subscribedInvalidations } from "./subscription-invalidation";
 import {
   type AccessAuth,
   type ApiCall,
-  type ApiContract,
   type ApiHandlerArgs,
-  type ApiHandlers,
+  type ApiHandler,
   type Batch,
   type Broadcast,
   type CollectionSubscription,
   type CollectionSubscriptionResult,
-  type CollectionConfigs,
   type PushResult,
   type ReadQuery,
   type ReadResult,
@@ -33,25 +29,18 @@ import {
 } from "./types";
 import { validateBatch } from "./validation";
 
-export interface Env {
-  SYNC_SHARDS: DurableObjectNamespace;
-}
+export type { CollectionShardOptions, Env } from "./durable-object-types";
 
-export interface CollectionShardOptions<TApi extends ApiContract = ApiContract> {
-  collections?: CollectionConfigs;
-  api?: ApiHandlers<TApi>;
-  authenticate?: (args: { clientId: string; request: Request }) => AccessAuth | Promise<AccessAuth>;
-  history?: HistoryOptions;
-}
+export class CollectionShardDurableObject implements DurableObject {
+  private readonly apiHandlers: Record<string, ApiHandler>;
 
-export class CollectionShardDurableObject<
-  TApi extends ApiContract = ApiContract,
-> implements DurableObject {
   constructor(
     private readonly state: DurableObjectState,
     private readonly env: Env,
-    private readonly options: CollectionShardOptions<TApi> = {},
-  ) {}
+    private readonly options: CollectionShardOptions = {},
+  ) {
+    this.apiHandlers = collectionApiHandlers(options.collections);
+  }
 
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") {
@@ -189,8 +178,11 @@ export class CollectionShardDurableObject<
   }
 
   private async callApi(ws: WebSocket, call: ApiCall): Promise<unknown> {
-    const handler = this.options.api?.[call.path];
-    if (!handler) throw new Error(`Unknown API path: ${call.path}`);
+    const handler = this.apiHandlers[call.path];
+
+    if (!handler) {
+      throw new Error(`Unknown API path: ${call.path}`);
+    }
 
     const clientId = this.clientId(ws);
     const auth = webSocketAuth(ws);

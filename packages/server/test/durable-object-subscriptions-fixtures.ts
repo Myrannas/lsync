@@ -148,6 +148,22 @@ export function ownershipTransfer(): Batch {
   };
 }
 
+export function ownershipSeed(): Batch {
+  return {
+    updates: [
+      {
+        id: "owner-seed",
+        collection: "/todos/",
+        key: "t1",
+        type: "insert",
+        value: { id: "t1", ownerId: "u1" },
+        clientId: "pusher",
+        createdAt: 0,
+      },
+    ],
+  };
+}
+
 export function referenceAccessOptions(): CollectionShardOptions {
   return {
     collections: {

@@ -22,6 +22,7 @@ vp install
 ```ts
 import {
   CollectionShardDurableObject,
+  Collections,
   createWorkerHandler,
   sqliteJsonTable,
   type Env,
@@ -47,26 +48,28 @@ const issueSchema = z.object({
 
 export class CollectionShard extends CollectionShardDurableObject {
   constructor(state: DurableObjectState, env: Env) {
+    const collections = Collections.builder()
+      .collection("todos", (collection) =>
+        collection
+          .schema(todoSchema)
+          .index("completed")
+          .api("health", z.undefined(), () => ({ ok: true })),
+      )
+      .collection("projects", (collection) =>
+        collection
+          .schema(projectSchema)
+          .storage(sqliteJsonTable({ tableName: "projects" }))
+          .child("issues", (child) =>
+            child
+              .schema(issueSchema)
+              .storage(sqliteJsonTable({ tableName: "issues" }))
+              .index("status"),
+          ),
+      )
+      .build();
+
     super(state, env, {
-      collections: {
-        "/todos/": {
-          schema: todoSchema,
-          storage: sqliteJsonTable({
-            indexes: [["completed"]],
-          }),
-        },
-        "/projects/": {
-          schema: projectSchema,
-          storage: sqliteJsonTable({ tableName: "projects", indexes: [] }),
-        },
-        "/projects/{projectId}/issues/": {
-          schema: issueSchema,
-          storage: sqliteJsonTable({
-            tableName: "issues",
-            indexes: [["status"]],
-          }),
-        },
-      },
+      collections,
     });
   }
 }
