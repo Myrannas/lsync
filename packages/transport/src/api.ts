@@ -88,6 +88,15 @@ export const apiCallSchema = z.object({
   input: z.unknown().optional(),
 });
 
+export const collectionSubscriptionSchema = z.object({
+  collection: z.string().min(1),
+});
+
+export const collectionSubscriptionResultSchema = z.object({
+  collection: z.string(),
+  subscriptions: z.array(z.string()),
+});
+
 export const broadcastSchema = z.object({
   type: z.literal("updates"),
   shardId: z.string(),
@@ -97,6 +106,7 @@ export const broadcastSchema = z.object({
 export const webSocketAttachmentSchema = z.object({
   clientId: z.string(),
   connectedAt: z.number(),
+  subscriptions: z.array(z.string()).default([]),
 });
 
 export type OperationType = z.infer<typeof operationTypeSchema>;
@@ -111,6 +121,9 @@ export type ReadOrderBy = z.output<typeof readOrderBySchema>;
 export type ReadOrderByInput = z.input<typeof readOrderBySchema>;
 export type ApiCall = z.output<typeof apiCallSchema>;
 export type ApiCallInput = z.input<typeof apiCallSchema>;
+export type CollectionSubscription = z.output<typeof collectionSubscriptionSchema>;
+export type CollectionSubscriptionInput = z.input<typeof collectionSubscriptionSchema>;
+export type CollectionSubscriptionResult = z.output<typeof collectionSubscriptionResultSchema>;
 
 export interface ApiRoute<TInput = unknown, TOutput = unknown> {
   input: TInput;

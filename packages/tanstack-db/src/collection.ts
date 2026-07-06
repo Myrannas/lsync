@@ -103,7 +103,7 @@ export function collectionOptions<
             }, subsetGcTime),
           );
         };
-        const unsubscribe = client.subscribe((broadcast) => {
+        const subscription = client.subscribe(options.collection, (broadcast) => {
           const changes = broadcast.updates.flatMap((update) => {
             if (update.collection !== options.collection) return [];
             const ownUpdate = update.clientId === client.clientId;
@@ -161,6 +161,7 @@ export function collectionOptions<
               options.read === false ? undefined : options.read,
               subsetOptions,
             );
+            await subscription.ready;
             const result = await client.read<T>(query);
             const removedKeys = subsets.replace(
               id,
@@ -200,7 +201,7 @@ export function collectionOptions<
               if (activeSubsets === subsets) {
                 activeSubsets = undefined;
               }
-              unsubscribe();
+              subscription.unsubscribe();
               lease?.release();
             },
           };
@@ -208,23 +209,27 @@ export function collectionOptions<
 
         const initialQuery = initialReadQuery(options.collection, options.read);
         if (!initialQuery) {
-          markReady();
-        } else {
-          void client.read<T>(initialQuery).then((result) => {
-            if (result.rows.length > 0) {
-              begin();
-              writeRows(collection, result.rows, options.getKey, write);
-              commit();
-            }
+          void subscription.ready.then(() => {
             markReady();
           });
+        } else {
+          void subscription.ready
+            .then(() => client.read<T>(initialQuery))
+            .then((result) => {
+              if (result.rows.length > 0) {
+                begin();
+                writeRows(collection, result.rows, options.getKey, write);
+                commit();
+              }
+              markReady();
+            });
         }
 
         return () => {
           if (activeSubsets === subsets) {
             activeSubsets = undefined;
           }
-          unsubscribe();
+          subscription.unsubscribe();
           lease?.release();
         };
       },

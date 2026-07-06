@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { apiCallSchema, batchSchema, broadcastSchema, readQuerySchema } from "./api";
+import {
+  apiCallSchema,
+  batchSchema,
+  broadcastSchema,
+  collectionSubscriptionSchema,
+  readQuerySchema,
+} from "./api";
 
 export const rpcIdSchema = z.union([z.string(), z.number()]).nullable().optional();
 
@@ -40,10 +46,21 @@ const clientRpcApiCallRequestSchema = z.object({
   }),
 });
 
+const clientRpcSubscriptionRequestSchema = z.object({
+  id: rpcIdSchema,
+  method: z.enum(["subscribe", "unsubscribe"]),
+  params: z.object({
+    input: z.object({
+      json: collectionSubscriptionSchema,
+    }),
+  }),
+});
+
 export const clientRpcRequestSchema = z.union([
   clientRpcMutationRequestSchema,
   clientRpcQueryRequestSchema,
   clientRpcApiCallRequestSchema,
+  clientRpcSubscriptionRequestSchema,
 ]);
 
 export const rpcResultMessageSchema = z.object({

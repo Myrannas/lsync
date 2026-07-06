@@ -252,7 +252,10 @@ function fakeClient(overrides: Partial<Client> = {}): Client {
     push: async (batch) => ({ accepted: batch.updates.length }),
     read: async () => ({ rows: [] }),
     call: async () => undefined,
-    subscribe: () => () => {},
+    subscribe: () => ({
+      ready: Promise.resolve(),
+      unsubscribe: () => {},
+    }),
     close: () => {},
     ...overrides,
   };

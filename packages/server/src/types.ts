@@ -5,6 +5,8 @@ import type {
   ApiOutput,
   ApiPath,
   Batch,
+  CollectionSubscription,
+  CollectionSubscriptionResult,
   PushResult,
   ReadQuery,
   ReadResult,
@@ -14,6 +16,8 @@ export {
   apiCallSchema,
   batchSchema,
   broadcastSchema,
+  collectionSubscriptionResultSchema,
+  collectionSubscriptionSchema,
   operationTypeSchema,
   pushResultSchema,
   readFilterOperatorSchema,
@@ -37,6 +41,9 @@ export type {
   ApiRoute,
   Batch,
   Broadcast,
+  CollectionSubscription,
+  CollectionSubscriptionInput,
+  CollectionSubscriptionResult,
   OperationType,
   PushResult,
   ReadFilter,
@@ -81,6 +88,8 @@ export interface ApiHandlerContext {
   validate(batch: Batch): void;
   persist(batch: Batch): void;
   publish(batch: Batch): void;
+  subscribe(input: CollectionSubscription): CollectionSubscriptionResult;
+  unsubscribe(input: CollectionSubscription): CollectionSubscriptionResult;
   mutate(batch: Batch): PushResult;
   read(query: ReadQuery): ReadResult;
 }

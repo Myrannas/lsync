@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { router } from "../src/router";
+import { router, type Context } from "../src/router";
 import type { Batch } from "../src/types";
 
 const batch: Batch = {
@@ -18,30 +18,26 @@ const batch: Batch = {
 describe("router", () => {
   it("validates and persists before publishing", async () => {
     const calls: Array<string> = [];
-    const caller = router.createCaller({
-      shardId: "shard-1",
-      validate: () => calls.push("validate"),
-      persist: () => calls.push("persist"),
-      publish: () => calls.push("publish"),
-      read: () => ({ rows: [] }),
-      callApi: () => undefined,
-    });
+    const caller = router.createCaller(
+      context({
+        validate: () => calls.push("validate"),
+        persist: () => calls.push("persist"),
+        publish: () => calls.push("publish"),
+      }),
+    );
 
     await expect(caller.push(batch)).resolves.toEqual({ accepted: 1 });
     expect(calls).toEqual(["validate", "persist", "publish"]);
   });
 
   it("reads rows through the configured context", async () => {
-    const caller = router.createCaller({
-      shardId: "shard-1",
-      validate: () => undefined,
-      persist: () => undefined,
-      publish: () => undefined,
-      read: (query) => ({
-        rows: [{ id: "1", collection: query.collection }],
+    const caller = router.createCaller(
+      context({
+        read: (query) => ({
+          rows: [{ id: "1", collection: query.collection }],
+        }),
       }),
-      callApi: () => undefined,
-    });
+    );
 
     await expect(
       caller.read({
@@ -54,17 +50,14 @@ describe("router", () => {
   });
 
   it("dispatches custom API calls through the configured context", async () => {
-    const caller = router.createCaller({
-      shardId: "shard-1",
-      validate: () => undefined,
-      persist: () => undefined,
-      publish: () => undefined,
-      read: () => ({ rows: [] }),
-      callApi: (call) => ({
-        path: call.path,
-        input: call.input,
+    const caller = router.createCaller(
+      context({
+        callApi: (call) => ({
+          path: call.path,
+          input: call.input,
+        }),
       }),
-    });
+    );
 
     await expect(
       caller.api({
@@ -76,4 +69,56 @@ describe("router", () => {
       input: { collection: "todos" },
     });
   });
+
+  it("dispatches subscription controls through the configured context", async () => {
+    const calls: Array<string> = [];
+    const caller = router.createCaller(
+      context({
+        subscribe: (input) => {
+          calls.push(`subscribe:${input.collection}`);
+          return {
+            collection: "/todos/",
+            subscriptions: ["/todos/"],
+          };
+        },
+        unsubscribe: (input) => {
+          calls.push(`unsubscribe:${input.collection}`);
+          return {
+            collection: "/todos/",
+            subscriptions: [],
+          };
+        },
+      }),
+    );
+
+    await expect(caller.subscribe({ collection: "todos" })).resolves.toEqual({
+      collection: "/todos/",
+      subscriptions: ["/todos/"],
+    });
+    await expect(caller.unsubscribe({ collection: "todos" })).resolves.toEqual({
+      collection: "/todos/",
+      subscriptions: [],
+    });
+    expect(calls).toEqual(["subscribe:todos", "unsubscribe:todos"]);
+  });
 });
+
+function context(overrides: Partial<Context> = {}): Context {
+  return {
+    shardId: "shard-1",
+    validate: () => undefined,
+    persist: () => undefined,
+    publish: () => undefined,
+    subscribe: () => ({
+      collection: "/todos/",
+      subscriptions: ["/todos/"],
+    }),
+    unsubscribe: () => ({
+      collection: "/todos/",
+      subscriptions: [],
+    }),
+    read: () => ({ rows: [] }),
+    callApi: () => undefined,
+    ...overrides,
+  };
+}

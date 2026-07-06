@@ -2,9 +2,13 @@ import { initTRPC } from "@trpc/server";
 import {
   apiCallSchema,
   batchSchema,
+  collectionSubscriptionResultSchema,
+  collectionSubscriptionSchema,
   readQuerySchema,
   type ApiCall,
   type Batch,
+  type CollectionSubscription,
+  type CollectionSubscriptionResult,
   type PushResult,
   type ReadQuery,
   type ReadResult,
@@ -15,6 +19,8 @@ export interface Context {
   validate: (batch: Batch) => void;
   persist: (batch: Batch) => void;
   publish: (batch: Batch) => void;
+  subscribe: (input: CollectionSubscription) => CollectionSubscriptionResult;
+  unsubscribe: (input: CollectionSubscription) => CollectionSubscriptionResult;
   read: (query: ReadQuery) => ReadResult;
   callApi: (call: ApiCall) => unknown;
 }
@@ -31,6 +37,18 @@ export const router = t.router({
   read: t.procedure.input(readQuerySchema).query(({ ctx, input }): ReadResult => {
     return ctx.read(normalizeReadQuery(input));
   }),
+  subscribe: t.procedure
+    .input(collectionSubscriptionSchema)
+    .output(collectionSubscriptionResultSchema)
+    .mutation(({ ctx, input }) => {
+      return ctx.subscribe(input);
+    }),
+  unsubscribe: t.procedure
+    .input(collectionSubscriptionSchema)
+    .output(collectionSubscriptionResultSchema)
+    .mutation(({ ctx, input }) => {
+      return ctx.unsubscribe(input);
+    }),
   api: t.procedure.input(apiCallSchema).mutation(({ ctx, input }): unknown => {
     return ctx.callApi(input);
   }),

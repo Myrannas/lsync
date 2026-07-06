@@ -28,6 +28,7 @@ export type {
   Broadcast,
   Client,
   ClientOptions,
+  ClientSubscription,
   CollectionConnectionOptions,
   CollectionOptions,
   PushResult,

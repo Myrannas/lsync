@@ -11,6 +11,7 @@ import type {
   ApiRoute as TransportApiRoute,
   Batch as TransportBatch,
   Broadcast as TransportBroadcast,
+  CollectionSubscriptionResult,
   PushResult as TransportPushResult,
   ReadFilterInput,
   ReadFilterOperator as TransportReadFilterOperator,
@@ -41,6 +42,7 @@ export type ApiPath<TApi extends ApiContract> = TransportApiPath<TApi>;
 export type ApiRoute<TInput = unknown, TOutput = unknown> = TransportApiRoute<TInput, TOutput>;
 export type Batch = TransportBatch;
 export type Broadcast = TransportBroadcast;
+export type SubscriptionControlResult = CollectionSubscriptionResult;
 export type PushResult = TransportPushResult;
 export type ReadFilterOperator = TransportReadFilterOperator;
 export type ReadFilter = ReadFilterInput;
@@ -93,6 +95,11 @@ export interface Client<TApi extends ApiContract = ApiContract> {
     path: TPath,
     ...args: ApiCallArgs<TApi, TPath>
   ): Promise<ApiOutput<TApi, TPath>>;
-  subscribe(listener: (broadcast: Broadcast) => void): () => void;
+  subscribe(collection: string, listener: (broadcast: Broadcast) => void): ClientSubscription;
   close(): void;
+}
+
+export interface ClientSubscription {
+  readonly ready: Promise<void>;
+  unsubscribe(): void;
 }

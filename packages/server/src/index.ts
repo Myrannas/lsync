@@ -1,4 +1,5 @@
-export { CollectionShardDurableObject, createWorkerHandler } from "./durable-object";
+export { CollectionShardDurableObject } from "./durable-object";
+export { createWorkerHandler } from "./worker";
 export {
   collectionScope,
   isCollectionPattern,
@@ -32,6 +33,9 @@ export type {
   ApiRoute,
   Batch,
   Broadcast,
+  CollectionSubscription,
+  CollectionSubscriptionInput,
+  CollectionSubscriptionResult,
   CollectionConfig,
   CollectionConfigs,
   CollectionStorageConfig,
@@ -49,4 +53,5 @@ export type {
   Update,
   WebSocketAttachment,
 } from "./types";
-export type { CollectionShardOptions, Env, WorkerOptions } from "./durable-object";
+export type { CollectionShardOptions, Env } from "./durable-object";
+export type { WorkerOptions } from "./worker";
