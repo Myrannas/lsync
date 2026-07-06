@@ -80,10 +80,8 @@ export class CollectionShardDurableObject<
   }
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
-    const text = typeof message === "string" ? message : new TextDecoder().decode(message);
-
     try {
-      const request = parseClientRpcRequest(text);
+      const request = parseClientRpcRequest(message);
 
       const caller = router.createCaller({
         shardId: this.shardId(),
@@ -100,7 +98,7 @@ export class CollectionShardDurableObject<
       const result = await callRouter(caller, request);
       sendRpcResult(ws, request.id, result);
     } catch (error) {
-      sendRpcError(ws, readRpcId(text), error);
+      sendRpcError(ws, readRpcId(message), error);
     }
   }
 

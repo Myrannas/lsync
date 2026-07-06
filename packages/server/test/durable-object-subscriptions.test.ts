@@ -1,35 +1,18 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
+import {
+  encodeClientRpcRequest,
+  parseServerMessage,
+  type ClientRpcRequest,
+  type ServerMessage,
+} from "../../transport/src/rpc";
 import { eq } from "../src";
 import { CollectionShardDurableObject, type CollectionShardOptions } from "../src/durable-object";
 import type { Batch, WebSocketAttachment } from "../src/types";
 import { FakeSql } from "./storage-test-utils";
 
-interface TestMessage {
-  id?: string;
-  error?: {
-    message: string;
-  };
-  method?: string;
-  params?: {
-    input: {
-      json: {
-        updates: Batch["updates"];
-      };
-    };
-  };
-}
-
-interface SubscriptionTestMessage extends TestMessage {
-  method: "subscription";
-  params: {
-    input: {
-      json: {
-        updates: Batch["updates"];
-      };
-    };
-  };
-}
+type TestMessage = ServerMessage;
+type SubscriptionTestMessage = Extract<ServerMessage, { method: "subscription" }>;
 
 describe("CollectionShardDurableObject subscriptions", () => {
   it("stores collection subscriptions in the WebSocket attachment", async () => {
@@ -162,11 +145,11 @@ function fakeSocket(
 }
 
 class FakeSocket {
-  readonly messages: Array<string> = [];
+  readonly messages: Array<ArrayBuffer> = [];
 
   constructor(private attachment: WebSocketAttachment) {}
 
-  send(data: string): void {
+  send(data: ArrayBuffer): void {
     this.messages.push(data);
   }
 
@@ -179,9 +162,15 @@ class FakeSocket {
   }
 }
 
-function rpc(id: string, path: "push" | "subscribe" | "unsubscribe", json: unknown): string {
+function rpc(id: string, path: "push", json: Batch): ArrayBuffer;
+function rpc(
+  id: string,
+  path: "subscribe" | "unsubscribe",
+  json: { collection: string },
+): ArrayBuffer;
+function rpc(id: string, path: "push" | "subscribe" | "unsubscribe", json: Batch): ArrayBuffer {
   if (path === "subscribe" || path === "unsubscribe") {
-    return JSON.stringify({
+    return encodeClientRpcRequest({
       id,
       method: path,
       params: {
@@ -189,10 +178,10 @@ function rpc(id: string, path: "push" | "subscribe" | "unsubscribe", json: unkno
           json,
         },
       },
-    });
+    } satisfies ClientRpcRequest);
   }
 
-  return JSON.stringify({
+  return encodeClientRpcRequest({
     id,
     method: "mutation",
     params: {
@@ -201,7 +190,7 @@ function rpc(id: string, path: "push" | "subscribe" | "unsubscribe", json: unkno
         json,
       },
     },
-  });
+  } satisfies ClientRpcRequest);
 }
 
 function mixedBatch(): Batch {
@@ -263,9 +252,12 @@ function subscriptionKeys(socket: FakeSocket): Array<string | number> {
 function subscriptionMessages(socket: FakeSocket): Array<SubscriptionTestMessage> {
   return socket.messages
     .map(parseMessage)
-    .filter((message): message is SubscriptionTestMessage => message.method === "subscription");
+    .filter(
+      (message): message is SubscriptionTestMessage =>
+        "method" in message && message.method === "subscription",
+    );
 }
 
-function parseMessage(message: string): TestMessage {
-  return JSON.parse(message) as TestMessage;
+function parseMessage(message: ArrayBuffer): TestMessage {
+  return parseServerMessage(message);
 }

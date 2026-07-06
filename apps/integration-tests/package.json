@@ -6,6 +6,9 @@
   "scripts": {
     "e2e": "vp test run --config vite.config.ts test/smoke.e2e.ts"
   },
+  "dependencies": {
+    "@msgpack/msgpack": "catalog:"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",

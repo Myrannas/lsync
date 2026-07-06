@@ -57,6 +57,7 @@ export function createClient<TApi extends ApiContract = ApiContract>(
       const url = new URL(options.url);
       url.searchParams.set("clientId", clientId);
       const ws = new WebSocket(url);
+      ws.binaryType = "arraybuffer";
 
       ws.addEventListener("open", () => {
         socket = ws;
@@ -73,7 +74,7 @@ export function createClient<TApi extends ApiContract = ApiContract>(
       });
 
       ws.addEventListener("message", (event) => {
-        const message = parseServerMessage(String(event.data));
+        const message = parseServerMessage(event.data);
 
         if ("method" in message) {
           subscriptions.dispatch(message.params.input.json);

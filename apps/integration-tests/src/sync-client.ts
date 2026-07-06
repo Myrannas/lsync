@@ -1,3 +1,5 @@
+import { decode, encode } from "@msgpack/msgpack";
+
 interface RpcSuccess<T> {
   id: string;
   result: {
@@ -16,6 +18,7 @@ interface RpcFailure {
 }
 
 type RpcResponse<T> = RpcSuccess<T> | RpcFailure;
+type BinaryMessage = ArrayBuffer | ArrayBufferView | Blob | string;
 const todosCollection = "/todos/";
 
 export interface TodoRow {
@@ -66,6 +69,7 @@ export async function openSyncClient(url: string): Promise<SyncClient> {
 function openWebSocket(url: string): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
+    ws.binaryType = "arraybuffer";
     ws.addEventListener("open", () => resolve(ws));
     ws.addEventListener("error", () => reject(new Error(`Unable to open ${url}`)));
   });
@@ -83,8 +87,8 @@ function request<T>(ws: WebSocket, path: "api" | "push" | "read", input: unknown
   const method = path === "read" ? "query" : "mutation";
 
   return new Promise((resolve, reject) => {
-    const onMessage = (event: MessageEvent) => {
-      const response = JSON.parse(String(event.data)) as RpcResponse<T>;
+    const onMessage = async (event: MessageEvent) => {
+      const response = decodeMessage<T>(await messageData(event.data));
       if (response.id !== id) return;
 
       ws.removeEventListener("message", onMessage);
@@ -97,17 +101,53 @@ function request<T>(ws: WebSocket, path: "api" | "push" | "read", input: unknown
     };
 
     ws.addEventListener("message", onMessage);
-    ws.send(
-      JSON.stringify({
-        id,
-        method,
-        params: {
-          path,
-          input: {
-            json: input,
-          },
-        },
-      }),
-    );
+    ws.send(encodeMessage(requestMessage(id, method, path, input)));
   });
+}
+
+function requestMessage(
+  id: string,
+  method: "mutation" | "query",
+  path: "api" | "push" | "read",
+  input: unknown,
+): unknown {
+  if (path === "read") {
+    return {
+      id,
+      method: "query",
+      params: {
+        path: "read",
+        input: {
+          json: input,
+        },
+      },
+    };
+  }
+
+  return {
+    id,
+    method,
+    params: {
+      path,
+      input: {
+        json: input,
+      },
+    },
+  };
+}
+
+async function messageData(data: BinaryMessage): Promise<ArrayBuffer | ArrayBufferView | string> {
+  return data instanceof Blob ? data.arrayBuffer() : data;
+}
+
+function decodeMessage<T>(data: ArrayBuffer | ArrayBufferView | string): RpcResponse<T> {
+  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  return decode(bytes) as RpcResponse<T>;
+}
+
+function encodeMessage(message: unknown): ArrayBuffer {
+  const bytes = encode(message);
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
