@@ -19,6 +19,9 @@ import type {
   ReadOrderByInput,
   ReadQueryInput,
   ReadResult as TransportReadResult,
+  SequencedUpdate as TransportSequencedUpdate,
+  SyncChangesQueryInput as TransportSyncChangesQueryInput,
+  SyncChangesResult as TransportSyncChangesResult,
   Update as TransportUpdate,
 } from "lsync-transport";
 
@@ -44,6 +47,9 @@ export type Batch = TransportBatch;
 export type Broadcast = TransportBroadcast;
 export type SubscriptionControlResult = CollectionSubscriptionResult;
 export type PushResult = TransportPushResult;
+export type SequencedUpdate = TransportSequencedUpdate;
+export type SyncChangesQuery = TransportSyncChangesQueryInput;
+export type SyncChangesResult = TransportSyncChangesResult;
 export type ReadFilterOperator = TransportReadFilterOperator;
 export type ReadFilter = ReadFilterInput;
 export type { ReadPredicate };
@@ -91,6 +97,7 @@ export interface Client<TApi extends ApiContract = ApiContract> {
   readonly clientId: string;
   push(batch: Batch): Promise<PushResult>;
   read<T = unknown>(query: ReadQuery): Promise<ReadResult<T>>;
+  changes(query: SyncChangesQuery): Promise<SyncChangesResult>;
   call<TPath extends ApiPath<TApi>>(
     path: TPath,
     ...args: ApiCallArgs<TApi, TPath>

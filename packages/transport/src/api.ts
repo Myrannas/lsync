@@ -14,6 +14,11 @@ export const updateSchema = z.object({
   createdAt: z.number(),
 });
 
+export const sequencedUpdateSchema = updateSchema.extend({
+  sequence: z.number().int().positive(),
+  serverCreatedAt: z.string(),
+});
+
 export const batchSchema = z.object({
   updates: z.array(updateSchema).min(1),
 });
@@ -81,7 +86,31 @@ export const readResultSchema = z.object({
 
 export const pushResultSchema = z.object({
   accepted: z.number().int().nonnegative(),
+  watermark: z.number().int().nonnegative(),
 });
+
+export const syncChangesQuerySchema = z.object({
+  collections: z.record(z.string(), z.number().int().nonnegative()),
+  limit: z.number().int().positive().max(1000).optional(),
+});
+
+const syncChangesPageResultSchema = z.object({
+  type: z.literal("changes"),
+  updates: z.array(sequencedUpdateSchema),
+  watermark: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+});
+
+const syncChangesResyncRequiredResultSchema = z.object({
+  type: z.literal("resyncRequired"),
+  collections: z.array(z.string()),
+  watermark: z.number().int().nonnegative(),
+});
+
+export const syncChangesResultSchema = z.discriminatedUnion("type", [
+  syncChangesPageResultSchema,
+  syncChangesResyncRequiredResultSchema,
+]);
 
 export const apiCallSchema = z.object({
   path: z.string().min(1),
@@ -100,7 +129,8 @@ export const collectionSubscriptionResultSchema = z.object({
 export const broadcastSchema = z.object({
   type: z.literal("updates"),
   shardId: z.string(),
-  updates: z.array(updateSchema),
+  updates: z.array(sequencedUpdateSchema),
+  watermark: z.number().int().nonnegative(),
 });
 
 export const webSocketAttachmentSchema = z.object({
@@ -112,6 +142,7 @@ export const webSocketAttachmentSchema = z.object({
 
 export type OperationType = z.infer<typeof operationTypeSchema>;
 export type Update = z.infer<typeof updateSchema>;
+export type SequencedUpdate = z.infer<typeof sequencedUpdateSchema>;
 export type Batch = z.infer<typeof batchSchema>;
 export type ReadFilterOperator = z.infer<typeof readFilterOperatorSchema>;
 export type ReadFilter = z.output<typeof readFilterSchema>;
@@ -162,6 +193,9 @@ export interface ReadQueryInput {
   offset?: number;
 }
 export type PushResult = z.infer<typeof pushResultSchema>;
+export type SyncChangesQuery = z.output<typeof syncChangesQuerySchema>;
+export type SyncChangesQueryInput = z.input<typeof syncChangesQuerySchema>;
+export type SyncChangesResult = z.infer<typeof syncChangesResultSchema>;
 export type Broadcast = z.infer<typeof broadcastSchema>;
 export type WebSocketAttachment = z.infer<typeof webSocketAttachmentSchema>;
 

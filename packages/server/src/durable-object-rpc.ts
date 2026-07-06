@@ -5,8 +5,12 @@ export function callRouter(
   caller: ReturnType<typeof router.createCaller>,
   request: ReturnType<typeof parseClientRpcRequest>,
 ): unknown {
-  if (request.method === "query") {
+  if (request.method === "query" && request.params.path === "read") {
     return caller.read(request.params.input.json);
+  }
+
+  if (request.method === "query" && request.params.path === "changes") {
+    return caller.changes(request.params.input.json);
   }
 
   if (request.method === "subscribe") {

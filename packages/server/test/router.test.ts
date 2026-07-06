@@ -21,12 +21,15 @@ describe("router", () => {
     const caller = router.createCaller(
       context({
         validate: () => calls.push("validate"),
-        persist: () => calls.push("persist"),
+        persist: () => {
+          calls.push("persist");
+          return { updates: [], watermark: 7 };
+        },
         publish: () => calls.push("publish"),
       }),
     );
 
-    await expect(caller.push(batch)).resolves.toEqual({ accepted: 1 });
+    await expect(caller.push(batch)).resolves.toEqual({ accepted: 1, watermark: 7 });
     expect(calls).toEqual(["validate", "persist", "publish"]);
   });
 
@@ -46,6 +49,26 @@ describe("router", () => {
       }),
     ).resolves.toEqual({
       rows: [{ id: "1", collection: "todos" }],
+    });
+  });
+
+  it("reads sync changes through the configured context", async () => {
+    const caller = router.createCaller(
+      context({
+        changes: (query) => ({
+          type: "changes",
+          updates: [],
+          watermark: query.collections.todos ?? 0,
+          hasMore: false,
+        }),
+      }),
+    );
+
+    await expect(caller.changes({ collections: { todos: 12 } })).resolves.toEqual({
+      type: "changes",
+      updates: [],
+      watermark: 12,
+      hasMore: false,
     });
   });
 
@@ -107,7 +130,7 @@ function context(overrides: Partial<Context> = {}): Context {
   return {
     shardId: "shard-1",
     validate: () => undefined,
-    persist: () => undefined,
+    persist: () => ({ updates: [], watermark: 0 }),
     publish: () => undefined,
     subscribe: () => ({
       collection: "/todos/",
@@ -118,6 +141,7 @@ function context(overrides: Partial<Context> = {}): Context {
       subscriptions: [],
     }),
     read: () => ({ rows: [] }),
+    changes: () => ({ type: "changes", updates: [], watermark: 0, hasMore: false }),
     callApi: () => undefined,
     ...overrides,
   };

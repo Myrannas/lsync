@@ -249,8 +249,9 @@ describe("CollectionTypes.builder", () => {
 function fakeClient(overrides: Partial<Client> = {}): Client {
   return {
     clientId: "test-client",
-    push: async (batch) => ({ accepted: batch.updates.length }),
+    push: async (batch) => ({ accepted: batch.updates.length, watermark: 0 }),
     read: async () => ({ rows: [] }),
+    changes: async () => ({ type: "changes", updates: [], watermark: 0, hasMore: false }),
     call: async () => undefined,
     subscribe: () => ({
       ready: Promise.resolve(),

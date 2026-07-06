@@ -22,8 +22,9 @@ describe("collectionOptions sync", () => {
     let unsubscribed = false;
     const client: Client = {
       clientId: "client-1",
-      push: async (batch) => ({ accepted: batch.updates.length }),
+      push: async (batch) => ({ accepted: batch.updates.length, watermark: 0 }),
       read: async () => ({ rows: [] }),
+      changes: async () => ({ type: "changes", updates: [], watermark: 0, hasMore: false }),
       call: async () => undefined,
       subscribe: (collection) => {
         subscriptions.push(collection);
@@ -56,11 +57,12 @@ describe("collectionOptions sync", () => {
     let ready!: () => void;
     const client: Client = {
       clientId: "client-1",
-      push: async (batch) => ({ accepted: batch.updates.length }),
+      push: async (batch) => ({ accepted: batch.updates.length, watermark: 0 }),
       read: async () => {
         calls.push("read");
         return { rows: [] };
       },
+      changes: async () => ({ type: "changes", updates: [], watermark: 0, hasMore: false }),
       call: async () => undefined,
       subscribe: () => ({
         ready: new Promise((resolve) => {
@@ -97,10 +99,11 @@ describe("collectionOptions sync", () => {
     const writes: Array<unknown> = [];
     const client: Client = {
       clientId: "client-1",
-      push: async (batch) => ({ accepted: batch.updates.length }),
+      push: async (batch) => ({ accepted: batch.updates.length, watermark: 0 }),
       read: async () => ({
         rows: [{ id: "1", text: "Write tests", completed: false }],
       }),
+      changes: async () => ({ type: "changes", updates: [], watermark: 0, hasMore: false }),
       call: async () => undefined,
       subscribe: (_collection, next) => {
         listener = next;
@@ -154,6 +157,9 @@ describe("collectionOptions sync", () => {
       }),
     } as never);
     listener?.({
+      type: "updates",
+      shardId: "shard-1",
+      watermark: 1,
       updates: [
         {
           id: "mutation-1",
@@ -163,6 +169,8 @@ describe("collectionOptions sync", () => {
           value: { id: "1", text: "Write tests", completed: true },
           clientId: "client-1",
           createdAt: 2000,
+          sequence: 1,
+          serverCreatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
     });

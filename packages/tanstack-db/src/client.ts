@@ -16,6 +16,8 @@ import type {
   ReadQuery,
   ReadResult,
   SubscriptionControlResult,
+  SyncChangesQuery,
+  SyncChangesResult,
 } from "./types";
 
 type Router = any;
@@ -190,6 +192,9 @@ export function createClient<TApi extends ApiContract = ApiContract>(
     read: {
       query: <T = unknown>(query: ReadQuery) => Promise<ReadResult<T>>;
     };
+    changes: {
+      query: (query: SyncChangesQuery) => Promise<SyncChangesResult>;
+    };
     api: {
       mutate: <TResult = unknown>(call: ApiCall) => Promise<TResult>;
     };
@@ -199,6 +204,7 @@ export function createClient<TApi extends ApiContract = ApiContract>(
     clientId,
     push: (batch) => trpc.push.mutate(batch),
     read: (query) => trpc.read.query(query),
+    changes: (query) => trpc.changes.query(query),
     call: <TPath extends ApiPath<TApi>>(path: TPath, ...args: ApiCallArgs<TApi, TPath>) => {
       const [input] = args;
       return trpc.api.mutate<ApiOutput<TApi, TPath>>({ path, input });
