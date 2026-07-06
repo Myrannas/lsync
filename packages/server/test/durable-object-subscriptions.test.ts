@@ -128,6 +128,18 @@ class FakeSocket {
 }
 
 function rpc(id: string, path: "push" | "subscribe" | "unsubscribe", json: unknown): string {
+  if (path === "subscribe" || path === "unsubscribe") {
+    return JSON.stringify({
+      id,
+      method: path,
+      params: {
+        input: {
+          json,
+        },
+      },
+    });
+  }
+
   return JSON.stringify({
     id,
     method: "mutation",

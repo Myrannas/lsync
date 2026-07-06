@@ -135,15 +135,14 @@ export function createClient<TApi extends ApiContract = ApiContract>(
 
   const sendSubscriptionControl = async (
     ws: WebSocket,
-    path: "subscribe" | "unsubscribe",
+    method: "subscribe" | "unsubscribe",
     collection: string,
   ): Promise<SubscriptionControlResult> => {
     const id = String(nextId++);
     return sendRequest<SubscriptionControlResult>(ws, {
       id,
-      method: "mutation",
+      method,
       params: {
-        path,
         input: {
           json: {
             collection,

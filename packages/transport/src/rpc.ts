@@ -48,9 +48,8 @@ const clientRpcApiCallRequestSchema = z.object({
 
 const clientRpcSubscriptionRequestSchema = z.object({
   id: rpcIdSchema,
-  method: z.literal("mutation"),
+  method: z.enum(["subscribe", "unsubscribe"]),
   params: z.object({
-    path: z.enum(["subscribe", "unsubscribe"]),
     input: z.object({
       json: collectionSubscriptionSchema,
     }),

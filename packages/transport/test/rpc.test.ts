@@ -40,9 +40,8 @@ describe("parseClientRpcRequest", () => {
       parseClientRpcRequest(
         JSON.stringify({
           id: "2",
-          method: "mutation",
+          method: "subscribe",
           params: {
-            path: "subscribe",
             input: {
               json: {
                 collection: "/projects/p1/issues/",
@@ -53,9 +52,8 @@ describe("parseClientRpcRequest", () => {
       ),
     ).toEqual({
       id: "2",
-      method: "mutation",
+      method: "subscribe",
       params: {
-        path: "subscribe",
         input: {
           json: {
             collection: "/projects/p1/issues/",
@@ -68,9 +66,8 @@ describe("parseClientRpcRequest", () => {
       parseClientRpcRequest(
         JSON.stringify({
           id: "3",
-          method: "mutation",
+          method: "unsubscribe",
           params: {
-            path: "unsubscribe",
             input: {
               json: {
                 collection: "/projects/p1/issues/",
@@ -81,9 +78,8 @@ describe("parseClientRpcRequest", () => {
       ),
     ).toEqual({
       id: "3",
-      method: "mutation",
+      method: "unsubscribe",
       params: {
-        path: "unsubscribe",
         input: {
           json: {
             collection: "/projects/p1/issues/",

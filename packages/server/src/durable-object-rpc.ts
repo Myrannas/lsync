@@ -9,16 +9,20 @@ export function callRouter(
     return caller.read(request.params.input.json);
   }
 
-  if (request.params.path === "push") {
-    return caller.push(request.params.input.json);
-  }
-
-  if (request.params.path === "subscribe") {
+  if (request.method === "subscribe") {
     return caller.subscribe(request.params.input.json);
   }
 
-  if (request.params.path === "unsubscribe") {
+  if (request.method === "unsubscribe") {
     return caller.unsubscribe(request.params.input.json);
+  }
+
+  if (request.method !== "mutation") {
+    throw new Error("Unsupported operation");
+  }
+
+  if (request.params.path === "push") {
+    return caller.push(request.params.input.json);
   }
 
   if (request.params.path === "api") {
