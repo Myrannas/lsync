@@ -5,6 +5,8 @@ import type {
   SQLiteJsonStorageConfig,
 } from "./types";
 import { collectionScope, resolveCollection } from "./collections";
+import sqlTag, { join, type Sql } from "sql-template-tag";
+import { execSql, identifierSql, rawSql } from "./sqlite-sql";
 
 export { readSQLiteJsonRows } from "./sqlite-json-read";
 
@@ -46,8 +48,10 @@ export function ensureSQLiteJsonTables(
     }
 
     const table = tableName(collectionName, collection.storage);
-    const result = sql.exec(`
-      CREATE TABLE IF NOT EXISTS ${quoteIdentifier(table)} (
+    const result = execSql(
+      sql,
+      sqlTag`
+      CREATE TABLE IF NOT EXISTS ${identifierSql(table)} (
         key TEXT NOT NULL,
         path TEXT NOT NULL,
         value TEXT NOT NULL,
@@ -56,15 +60,15 @@ export function ensureSQLiteJsonTables(
         updated_at TEXT NOT NULL,
         PRIMARY KEY (path, key)
       )
-    `);
+    `,
+    );
 
     for (const index of collection.storage.indexes) {
-      sql.exec(createIndexSql(table, index));
+      execSql(sql, createIndexSql(table, index));
     }
 
     if ((result as unknown as { rowsWritten: number }).rowsWritten > 0) {
       if (collection.initialData) {
-        const insertSql = `INSERT INTO ${quoteIdentifier(table)} (key, path, value, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`;
         for (const data of collection.initialData) {
           const key = String(data.id);
           const path = collectionScope(collectionName);
@@ -72,7 +76,13 @@ export function ensureSQLiteJsonTables(
           const version = 1;
           const createdAt = new Date().toISOString();
           const updatedAt = createdAt;
-          sql.exec(insertSql, key, path, value, version, createdAt, updatedAt);
+          execSql(
+            sql,
+            sqlTag`
+              INSERT INTO ${identifierSql(table)} (key, path, value, version, created_at, updated_at)
+              VALUES (${key}, ${path}, ${value}, ${version}, ${createdAt}, ${updatedAt})
+            `,
+          );
         }
       }
     }
@@ -99,82 +109,63 @@ export function applySQLiteJsonBatch(
     const updatedAt = new Date(update.createdAt).toISOString();
 
     if (update.type === "delete") {
-      sql.exec(
-        `DELETE FROM ${quoteIdentifier(table)} WHERE ${whereKeySql()}`,
-        ...keyBindings(scope, key),
-      );
+      execSql(sql, sqlTag`DELETE FROM ${identifierSql(table)} WHERE ${whereKeySql(scope, key)}`);
       continue;
     }
 
     if (update.type === "insert") {
-      sql.exec(
-        `
-          INSERT INTO ${quoteIdentifier(table)} (key, path, value, version, created_at, updated_at)
-          VALUES (?, ?, ?, 1, ?, ?)
+      execSql(
+        sql,
+        sqlTag`
+          INSERT INTO ${identifierSql(table)} (key, path, value, version, created_at, updated_at)
+          VALUES (${key}, ${scope}, ${stringifyRow(update.value)}, 1, ${updatedAt}, ${updatedAt})
           ON CONFLICT(path, key) DO UPDATE SET
             path = excluded.path,
             value = excluded.value,
-            version = ${quoteIdentifier(table)}.version + 1,
+            version = ${identifierSql(table)}.version + 1,
             updated_at = excluded.updated_at
         `,
-        key,
-        scope,
-        stringifyRow(update.value),
-        updatedAt,
-        updatedAt,
       );
       continue;
     }
 
-    const existing = sql
-      .exec<{ value: string }>(
-        `SELECT value FROM ${quoteIdentifier(table)} WHERE ${whereKeySql()}`,
-        ...keyBindings(scope, key),
-      )
-      .toArray()[0];
+    const existing = execSql<{ value: string }>(
+      sql,
+      sqlTag`SELECT value FROM ${identifierSql(table)} WHERE ${whereKeySql(scope, key)}`,
+    ).toArray()[0];
 
     if (!existing) {
       throw new Error(`Cannot update missing ${update.collection} row: ${key}`);
     }
 
     const merged = mergeRows(JSON.parse(existing.value), update.value);
-    sql.exec(
-      `
-        UPDATE ${quoteIdentifier(table)}
-        SET value = ?, version = version + 1, updated_at = ?
-        WHERE ${whereKeySql()}
+    execSql(
+      sql,
+      sqlTag`
+        UPDATE ${identifierSql(table)}
+        SET value = ${JSON.stringify(merged)}, version = version + 1, updated_at = ${updatedAt}
+        WHERE ${whereKeySql(scope, key)}
       `,
-      JSON.stringify(merged),
-      updatedAt,
-      ...keyBindings(scope, key),
     );
   }
 }
 
-function whereKeySql(): string {
-  return "path = ? AND key = ?";
-}
-
-function keyBindings(scope: string, key: string): Array<string> {
-  return [scope, key];
+function whereKeySql(scope: string, key: string): Sql {
+  return sqlTag`path = ${scope} AND key = ${key}`;
 }
 
 function tableName(collectionName: string, storage: SQLiteJsonStorageConfig): string {
   return storage.tableName ?? collectionName;
 }
 
-function createIndexSql(table: string, index: SQLiteJsonIndexConfig): string {
+function createIndexSql(table: string, index: SQLiteJsonIndexConfig): Sql {
   const name = index.name ?? `${table}_${index.fields.join("_")}_idx`;
-  const fields = index.fields.map((field) => `json_extract(value, '$.${jsonPath(field)}')`);
+  const fields = index.fields.map((field) => rawSql(`json_extract(value, '$.${jsonPath(field)}')`));
 
-  return `
-    CREATE INDEX IF NOT EXISTS ${quoteIdentifier(name)}
-    ON ${quoteIdentifier(table)} (${fields.join(", ")})
+  return sqlTag`
+    CREATE INDEX IF NOT EXISTS ${identifierSql(name)}
+    ON ${identifierSql(table)} (${join(fields)})
   `;
-}
-
-function quoteIdentifier(identifier: string): string {
-  return `"${identifier.replaceAll(`"`, `""`)}"`;
 }
 
 function jsonPath(field: string): string {

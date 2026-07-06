@@ -66,7 +66,7 @@ export class FakeSql implements SqlStorageLike {
       }
 
       const textPathIndex = bindings.indexOf("$.text");
-      if (normalized.includes("json_extract(value, ?) IN (?, ?)") && textPathIndex >= 0) {
+      if (/json_extract\(value, \?\) IN \(\?,\s*\?\)/.test(normalized) && textPathIndex >= 0) {
         const accepted = new Set(bindings.slice(textPathIndex + 1, textPathIndex + 3));
         rows = rows.filter(([, row]) => accepted.has(JSON.parse(row.value).text));
       }

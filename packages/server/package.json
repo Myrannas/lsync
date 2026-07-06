@@ -17,6 +17,7 @@
   "dependencies": {
     "@trpc/server": "catalog:",
     "lsync-transport": "workspace:*",
+    "sql-template-tag": "^5.2.1",
     "zod": "catalog:"
   },
   "devDependencies": {
