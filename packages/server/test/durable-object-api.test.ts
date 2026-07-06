@@ -124,10 +124,7 @@ function apiRpc(id: string, path: string, input?: unknown): ArrayBuffer {
     params: {
       path: "api",
       input: {
-        json: {
-          path,
-          input,
-        },
+        json: input === undefined ? { path } : { path, input },
       },
     },
   } satisfies ClientRpcRequest);

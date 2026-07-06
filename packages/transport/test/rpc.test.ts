@@ -41,6 +41,36 @@ describe("parseClientRpcRequest", () => {
     });
   });
 
+  it("accepts custom API calls without input", () => {
+    const request = parseClientRpcRequest(
+      encodeClientRpcRequest({
+        id: "1",
+        method: "mutation",
+        params: {
+          path: "api",
+          input: {
+            json: {
+              path: "todos.health",
+            },
+          },
+        },
+      }),
+    );
+
+    expect(request).toEqual({
+      id: "1",
+      method: "mutation",
+      params: {
+        path: "api",
+        input: {
+          json: {
+            path: "todos.health",
+          },
+        },
+      },
+    });
+  });
+
   it("accepts collection subscription controls", () => {
     expect(
       parseClientRpcRequest(

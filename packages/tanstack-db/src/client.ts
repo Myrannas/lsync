@@ -208,7 +208,8 @@ export function createClient<TApi extends ApiContract = ApiContract>(
     changes: (query) => trpc.changes.query(query),
     call: <TPath extends ApiPath<TApi>>(path: TPath, ...args: ApiCallArgs<TApi, TPath>) => {
       const [input] = args;
-      return trpc.api.mutate<ApiOutput<TApi, TPath>>({ path, input });
+      const call = input === undefined ? { path } : { path, input };
+      return trpc.api.mutate<ApiOutput<TApi, TPath>>(call);
     },
     subscribe: (collection, listener) => subscriptions.subscribe(collection, listener),
     close() {
