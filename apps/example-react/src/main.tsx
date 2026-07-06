@@ -1,6 +1,6 @@
 import { BasicIndex, eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
-import { createCollectionType } from "lsync-tanstack-db";
+import { CollectionTypes } from "lsync-tanstack-db";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { z } from "zod";
@@ -32,26 +32,27 @@ const shardId = new URLSearchParams(window.location.search).get("shard") ?? "dem
 const workerUrl = import.meta.env.VITE_SYNC_URL ?? "ws://localhost:8787";
 const syncUrl = `${workerUrl.replace(/\/$/, "")}/sync/${encodeURIComponent(shardId)}`;
 
-const users = createCollectionType({
-  path: "/users/",
-  url: syncUrl,
-  schema: z.object({
-    id: z.string(),
-    name: z.string(),
-  }),
-  getKey: (user) => user.id,
-  syncMode: "on-demand",
-  autoIndex: "eager",
-  defaultIndexType: BasicIndex,
-});
+const users = CollectionTypes.builder()
+  .name("users")
+  .schema(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+    }),
+  )
+  .url(syncUrl)
+  .key((user) => user.id)
+  .sync("on-demand")
+  .index("eager", BasicIndex)
+  .build();
 
-const todos = createCollectionType({
-  path: "/todos/",
-  url: syncUrl,
-  getKey: (todo: Todo) => todo.id,
-  schema: todoSchema,
-  syncMode: "on-demand",
-});
+const todos = CollectionTypes.builder()
+  .name("todos")
+  .schema(todoSchema)
+  .url(syncUrl)
+  .key((todo: Todo) => todo.id)
+  .sync("on-demand")
+  .build();
 
 function App() {
   const [text, setText] = useState("");

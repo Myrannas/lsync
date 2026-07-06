@@ -18,6 +18,45 @@ export type ChildManagers<TChildren extends CollectionTypeChildren> = {
   [K in keyof TChildren]: CollectionTypeForOptions<TChildren[K]>;
 };
 
+export interface CollectionApiHandlerArgs<TInput, T extends object, TKey extends string | number> {
+  input: TInput;
+  collection: Collection<T, TKey>;
+  params: CollectionScopeParams;
+  scope: string;
+}
+
+export type CollectionApiHandler<
+  TInput,
+  TOutput,
+  T extends object,
+  TKey extends string | number,
+> = (args: CollectionApiHandlerArgs<TInput, T, TKey>) => TOutput | Promise<TOutput>;
+
+export interface CollectionApiMethod<
+  TInput = undefined,
+  TOutput = unknown,
+  T extends object = any,
+  TKey extends string | number = any,
+> {
+  path?: string;
+  handler?: CollectionApiHandler<TInput, TOutput, T, TKey>;
+}
+
+export type CollectionTypeApi<T extends object, TKey extends string | number> = Record<
+  string,
+  CollectionApiMethod<any, any, T, TKey>
+>;
+
+export type CollectionApiCallArgs<TInput> = undefined extends TInput
+  ? [input?: TInput]
+  : [input: TInput];
+
+export type CollectionApiMethods<TApi extends CollectionTypeApi<any, any>> = {
+  [K in keyof TApi]: TApi[K] extends CollectionApiMethod<infer TInput, infer TOutput, any, any>
+    ? (...args: CollectionApiCallArgs<TInput>) => Promise<TOutput>
+    : never;
+};
+
 type CollectionMutations<T extends object, TKey extends string | number> = Pick<
   Collection<T, TKey>,
   "delete" | "insert" | "update"
@@ -42,17 +81,19 @@ export type CollectionType<
   T extends object,
   TKey extends string | number,
   TChildren extends CollectionTypeChildren = {},
+  TApi extends CollectionTypeApi<T, TKey> = {},
 > = {
   all(params?: CollectionScopeParams): Collection<T, TKey>;
-  with(params: CollectionScopeParams): CollectionType<T, TKey, TChildren>;
+  with(params: CollectionScopeParams): CollectionType<T, TKey, TChildren, TApi>;
   withId(id: TKey, childParam?: string): CollectionEntity<T, TKey, TChildren>;
   usage(): Array<CollectionUsage>;
 } & CollectionMutations<T, TKey> &
-  ChildManagers<TChildren>;
+  ChildManagers<TChildren> &
+  CollectionApiMethods<TApi>;
 
 export type CollectionTypeForOptions<TOption> =
-  TOption extends CollectionTypeBaseOptions<infer T, infer TKey, any, infer TChildren>
-    ? CollectionType<T, TKey, TChildren>
+  TOption extends CollectionTypeBaseOptions<infer T, infer TKey, any, infer TChildren, infer TApi>
+    ? CollectionType<T, TKey, TChildren, TApi>
     : never;
 
 export type CollectionTypeId = string | ((args: { path: string; scope: string }) => string);
@@ -62,13 +103,16 @@ export type CollectionTypeBaseOptions<
   TKey extends string | number,
   TSchema extends StandardSchemaV1,
   TChildren extends CollectionTypeChildren = {},
+  TApi extends CollectionTypeApi<T, TKey> = {},
 > = Omit<
   CollectionOptions<T, TKey, TSchema>,
   "client" | "collection" | "clientId" | "id" | "url"
 > & {
+  name: string;
   path: string;
   id?: CollectionTypeId;
   children?: TChildren;
+  api?: TApi;
   parentParam?: string;
 };
 
@@ -77,14 +121,16 @@ export type CollectionTypeOptions<
   TKey extends string | number,
   TSchema extends StandardSchemaV1,
   TChildren extends CollectionTypeChildren = {},
-> = CollectionTypeBaseOptions<T, TKey, TSchema, TChildren> & CollectionTypeConnection;
+  TApi extends CollectionTypeApi<T, TKey> = {},
+> = CollectionTypeBaseOptions<T, TKey, TSchema, TChildren, TApi> & CollectionTypeConnection;
 
 export type ChildCollectionTypeOptions<
   T extends object,
   TKey extends string | number,
   TSchema extends StandardSchemaV1,
   TChildren extends CollectionTypeChildren = {},
-> = CollectionTypeBaseOptions<T, TKey, TSchema, TChildren> & OptionalCollectionTypeConnection;
+  TApi extends CollectionTypeApi<T, TKey> = {},
+> = CollectionTypeBaseOptions<T, TKey, TSchema, TChildren, TApi> & OptionalCollectionTypeConnection;
 
 export type CollectionTypeConnection =
   | {

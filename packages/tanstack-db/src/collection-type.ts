@@ -2,9 +2,14 @@ import { createCollection, type Collection, type InferSchemaOutput } from "@tans
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { collectionScope, firstNewPathParam, type CollectionScopeParams } from "./collection-path";
 import { collectionOptions } from "./collection";
+import { acquireSharedClient } from "./client";
+import { defaultCollectionApiPath } from "./collection-api";
 import type {
   ChildCollectionTypeOptions,
   ChildManagers,
+  CollectionApiMethod,
+  CollectionApiMethods,
+  CollectionTypeApi,
   CollectionCache,
   CollectionCacheEntry,
   CollectionEntity,
@@ -17,49 +22,60 @@ import type {
   CollectionUsage,
   OptionalCollectionTypeConnection,
 } from "./collection-type-types";
+import type { ApiContract, Client } from "./types";
 
 export type { CollectionScopeParams };
 export type {
   ChildCollectionTypeOptions,
+  CollectionApiHandler,
+  CollectionApiHandlerArgs,
+  CollectionApiMethod,
+  CollectionApiMethods,
+  CollectionTypeApi,
   CollectionEntity,
   CollectionType,
   CollectionTypeOptions,
   CollectionUsage,
 } from "./collection-type-types";
 
-export function createCollectionType<
+export function createCollectionTypeFromOptions<
   TSchema extends StandardSchemaV1,
   TKey extends string | number = string | number,
   TChildren extends CollectionTypeChildren = {},
+  TApi extends CollectionTypeApi<InferSchemaOutput<TSchema>, TKey> = {},
 >(
-  options: CollectionTypeOptions<InferSchemaOutput<TSchema>, TKey, TSchema, TChildren> & {
+  options: CollectionTypeOptions<InferSchemaOutput<TSchema>, TKey, TSchema, TChildren, TApi> & {
     schema: TSchema;
   },
-): CollectionType<InferSchemaOutput<TSchema>, TKey, TChildren>;
+): CollectionType<InferSchemaOutput<TSchema>, TKey, TChildren, TApi>;
 
-export function createCollectionType<
+export function createCollectionTypeFromOptions<
   T extends object,
   TKey extends string | number = string | number,
   TChildren extends CollectionTypeChildren = {},
+  TApi extends CollectionTypeApi<T, TKey> = {},
 >(
-  options: CollectionTypeOptions<T, TKey, never, TChildren> & {
+  options: CollectionTypeOptions<T, TKey, never, TChildren, TApi> & {
     schema?: never;
   },
-): CollectionType<T, TKey, TChildren>;
+): CollectionType<T, TKey, TChildren, TApi>;
 
-export function createCollectionType<
+export function createCollectionTypeFromOptions<
   T extends object,
   TKey extends string | number,
   TSchema extends StandardSchemaV1,
   TChildren extends CollectionTypeChildren = {},
->(options: CollectionTypeOptions<T, TKey, TSchema, TChildren>): CollectionType<T, TKey, TChildren> {
+  TApi extends CollectionTypeApi<T, TKey> = {},
+>(
+  options: CollectionTypeOptions<T, TKey, TSchema, TChildren, TApi>,
+): CollectionType<T, TKey, TChildren, TApi> {
   const connection = connectionFrom(options);
 
   if (!connection) {
-    throw new Error("createCollectionType requires either client or url");
+    throw new Error("CollectionTypes.builder requires either client or url");
   }
 
-  return new CollectionTypeManager<T, TKey, TSchema, TChildren>(
+  return new CollectionTypeManager<T, TKey, TSchema, TChildren, TApi>(
     options,
     connection,
     {},
@@ -72,15 +88,16 @@ class CollectionTypeManager<
   TKey extends string | number,
   TSchema extends StandardSchemaV1,
   TChildren extends CollectionTypeChildren,
+  TApi extends CollectionTypeApi<T, TKey> = {},
 > {
   constructor(
-    private readonly options: CollectionTypeBaseOptions<T, TKey, TSchema, TChildren>,
+    private readonly options: CollectionTypeBaseOptions<T, TKey, TSchema, TChildren, TApi>,
     private readonly connection: CollectionTypeConnection,
     private readonly params: CollectionScopeParams,
     private readonly cache: CollectionCache,
   ) {}
 
-  api(): CollectionType<T, TKey, TChildren> {
+  api(): CollectionType<T, TKey, TChildren, TApi> {
     const base = {
       all: (params: CollectionScopeParams = {}) => this.all(params),
       delete: (...args: Parameters<Collection<T, TKey>["delete"]>) => this.all({}).delete(...args),
@@ -90,10 +107,12 @@ class CollectionTypeManager<
       update: (...args: Parameters<Collection<T, TKey>["update"]>) => this.all({}).update(...args),
       usage: () => this.usage(),
     };
-    return withChildren(base, this.childManagers(this.params)) as CollectionType<
+    const withApi = withApiMethods(base, this.apiMethods());
+    return withChildren(withApi, this.childManagers(this.params)) as CollectionType<
       T,
       TKey,
-      TChildren
+      TChildren,
+      TApi
     >;
   }
 
@@ -131,7 +150,7 @@ class CollectionTypeManager<
     return collection;
   }
 
-  private with(params: CollectionScopeParams): CollectionType<T, TKey, TChildren> {
+  private with(params: CollectionScopeParams): CollectionType<T, TKey, TChildren, TApi> {
     return new CollectionTypeManager(
       this.options,
       this.connection,
@@ -156,6 +175,41 @@ class CollectionTypeManager<
 
   private usage(): Array<CollectionUsage> {
     return [...this.cache.values()].map((entry) => ({ ...entry.usage }));
+  }
+
+  private apiMethods(): CollectionApiMethods<TApi> {
+    return Object.fromEntries(
+      Object.entries(this.options.api ?? {}).map(([name, method]) => [
+        name,
+        (...args: Array<unknown>) => this.callApi(name, method, args[0]),
+      ]),
+    ) as CollectionApiMethods<TApi>;
+  }
+
+  private async callApi(
+    name: string,
+    method: CollectionApiMethod<unknown, unknown, T, TKey>,
+    input: unknown,
+  ): Promise<unknown> {
+    if (method.handler) {
+      const scope = collectionScope(this.options.path, this.params);
+      return method.handler({
+        input,
+        collection: this.all({}),
+        params: this.params,
+        scope,
+      });
+    }
+
+    const path = method.path ?? defaultCollectionApiPath(this.options.path, name);
+    const lease = this.connection.client ? undefined : acquireSharedClient(this.connection);
+    const client = (this.connection.client ?? lease?.client) as Client<ApiContract>;
+
+    try {
+      return await client.call(path, input);
+    } finally {
+      lease?.release();
+    }
   }
 
   private childManagers(params: CollectionScopeParams): ChildManagers<TChildren> {
@@ -183,10 +237,12 @@ function collectionConfig<
   T extends object,
   TKey extends string | number,
   TSchema extends StandardSchemaV1,
->(options: CollectionTypeBaseOptions<T, TKey, TSchema, any>) {
-  const { children, id, parentParam, path, ...config } = options;
+>(options: CollectionTypeBaseOptions<T, TKey, TSchema, any, any>) {
+  const { api, children, id, name, parentParam, path, ...config } = options;
+  void api;
   void children;
   void id;
+  void name;
   void parentParam;
   void path;
   return config;
@@ -197,6 +253,19 @@ function withChildren<TTarget extends object, TChildren extends CollectionTypeCh
   children: ChildManagers<TChildren>,
 ): TTarget & ChildManagers<TChildren> {
   return Object.assign(target, children);
+}
+
+function withApiMethods<TTarget extends object, TApi extends CollectionTypeApi<any, any>>(
+  target: TTarget,
+  api: CollectionApiMethods<TApi>,
+): TTarget & CollectionApiMethods<TApi> {
+  for (const name of Object.keys(api)) {
+    if (name in target) {
+      throw new Error(`Collection API method conflicts with existing property: ${name}`);
+    }
+  }
+
+  return Object.assign(target, api);
 }
 
 function connectionFrom(
@@ -221,10 +290,10 @@ function collectionId(id: CollectionTypeId | undefined, path: string, scope: str
 }
 
 function firstChildParam(
-  options: CollectionTypeBaseOptions<any, any, any, any>,
+  options: CollectionTypeBaseOptions<any, any, any, any, any>,
 ): string | undefined {
   const child = Object.values(options.children ?? {})[0] as
-    | ChildCollectionTypeOptions<any, any, any, any>
+    | ChildCollectionTypeOptions<any, any, any, any, any>
     | undefined;
   return child?.parentParam ?? firstNewPathParam(child?.path, options.path);
 }

@@ -1,9 +1,14 @@
 export { createBatch, toChangeMessage } from "./batch";
 export { createClient } from "./client";
 export { collectionOptions } from "./collection";
-export { createCollectionType } from "./collection-type";
+export { CollectionTypes, CollectionTypeBuilder } from "./collection-type-builder";
 export type {
   ChildCollectionTypeOptions,
+  CollectionApiHandler,
+  CollectionApiHandlerArgs,
+  CollectionApiMethod,
+  CollectionApiMethods,
+  CollectionTypeApi,
   CollectionEntity,
   CollectionScopeParams,
   CollectionType,
