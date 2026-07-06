@@ -16,21 +16,19 @@ const batch: Batch = {
 };
 
 describe("router", () => {
-  it("validates and persists before publishing", async () => {
+  it("pushes batches through the mutation context", async () => {
     const calls: Array<string> = [];
     const caller = router.createCaller(
       context({
-        validate: () => calls.push("validate"),
-        persist: () => {
-          calls.push("persist");
-          return { updates: [], watermark: 7 };
+        mutate: (input) => {
+          calls.push("mutate");
+          return { accepted: input.updates.length, watermark: 7 };
         },
-        publish: () => calls.push("publish"),
       }),
     );
 
     await expect(caller.push(batch)).resolves.toEqual({ accepted: 1, watermark: 7 });
-    expect(calls).toEqual(["validate", "persist", "publish"]);
+    expect(calls).toEqual(["mutate"]);
   });
 
   it("reads rows through the configured context", async () => {
@@ -132,6 +130,7 @@ function context(overrides: Partial<Context> = {}): Context {
     validate: () => undefined,
     persist: () => ({ updates: [], watermark: 0 }),
     publish: () => undefined,
+    mutate: () => ({ accepted: 0, watermark: 0 }),
     subscribe: () => ({
       collection: "/todos/",
       subscriptions: ["/todos/"],

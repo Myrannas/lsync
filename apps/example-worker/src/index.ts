@@ -1,52 +1,26 @@
-import {
-  CollectionShardDurableObject,
-  Collections,
-  createWorkerHandler,
-  type Env,
-} from "lsync-server";
-import { z } from "zod";
+import { exampleCollections } from "@lfsync/example-definition";
+import { CollectionShardDurableObject, createWorkerHandler, type Env } from "lsync-server";
 
-const todoSchema = z.object({
-  id: z.string(),
-  text: z.string(),
-  createdBy: z.string(),
-  completed: z.boolean(),
-});
-
-const collectionNames = ["/todos/", "/users/"];
-
-const collections = Collections.builder()
-  .collection("todos", (collection) =>
-    collection
-      .schema(todoSchema)
-      .index("completed")
-      .api("health", z.undefined(), (): { collections: Array<string> } => ({
-        collections: collectionNames,
-      })),
+const shardOptions = CollectionShardDurableObject.from(exampleCollections)
+  .collection("todos", (todos) =>
+    todos.index("completed").api("health", () => ({ collections: collectionNames })),
   )
-  .collection("users", (collection) =>
-    collection
-      .schema(
-        z.object({
-          id: z.string(),
-          name: z.string(),
-        }),
-      )
-      .index("id")
-      .initialData({
+  .collection("users", (users) =>
+    users.index("id").initialData([
+      {
         id: "current-user",
         name: "Current user",
-      }),
+      },
+    ]),
   )
   .build();
 
+const collectionNames = Object.keys(shardOptions.collections ?? {}).sort();
 const syncHandler = createWorkerHandler();
 
 export class CollectionShard extends CollectionShardDurableObject {
   constructor(state: DurableObjectState, env: Env) {
-    super(state, env, {
-      collections,
-    });
+    super(state, env, shardOptions);
   }
 }
 

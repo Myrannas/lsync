@@ -1,7 +1,13 @@
 import { parseClientRpcRequest, readRpcId, sendServerMessage } from "lsync-transport";
-import { authorizeReadQuery, visibleUpdateForAuth, type AccessStore } from "./access";
+import {
+  authorizeReadQuery,
+  authorizeWriteBatch,
+  visibleUpdateForAuth,
+  type AccessStore,
+} from "./access";
 import { normalizeCollection } from "./collection-normalize";
 import { collectionApiHandlers } from "./collections";
+import { collectionShardOptionsFrom } from "./definition-builder";
 import { callRouter } from "./durable-object-rpc";
 import type { CollectionShardOptions, Env } from "./durable-object-types";
 import { persistSQLiteJsonBatchWithHistory, readSQLiteJsonChanges } from "./history";
@@ -13,8 +19,8 @@ import { subscribedInvalidations } from "./subscription-invalidation";
 import {
   type AccessAuth,
   type ApiCall,
-  type ApiHandlerArgs,
   type ApiHandler,
+  type ApiHandlerArgs,
   type Batch,
   type Broadcast,
   type CollectionSubscription,
@@ -32,6 +38,8 @@ import { validateBatch } from "./validation";
 export type { CollectionShardOptions, Env } from "./durable-object-types";
 
 export class CollectionShardDurableObject implements DurableObject {
+  static from = collectionShardOptionsFrom;
+
   private readonly apiHandlers: Record<string, ApiHandler>;
 
   constructor(
@@ -75,6 +83,7 @@ export class CollectionShardDurableObject implements DurableObject {
         validate: (input) => this.validate(input),
         persist: (input) => this.persist(input),
         publish: (input) => this.publish(input),
+        mutate: (input) => this.mutate(input, webSocketAuth(ws)),
         subscribe: (input) => this.subscribe(ws, input),
         unsubscribe: (input) => this.unsubscribe(ws, input),
         read: (input) => this.read(input, webSocketAuth(ws)),
@@ -195,7 +204,7 @@ export class CollectionShardDurableObject implements DurableObject {
       publish: (input) => this.publish(input),
       subscribe: (input) => this.subscribe(ws, input),
       unsubscribe: (input) => this.unsubscribe(ws, input),
-      mutate: (input) => this.mutate(input),
+      mutate: (input) => this.mutate(input, auth),
       read: (input) => this.read(input, auth),
       changes: (input) => this.readChanges(input, auth),
     };
@@ -204,8 +213,9 @@ export class CollectionShardDurableObject implements DurableObject {
     return handler(args);
   }
 
-  private mutate(batch: Batch): PushResult {
+  private mutate(batch: Batch, auth: AccessAuth = {}): PushResult {
     this.validate(batch);
+    authorizeWriteBatch(batch, this.options.collections, auth, this.accessStore());
     const persisted = this.persist(batch);
     this.publish(persisted);
     return { accepted: batch.updates.length, watermark: persisted.watermark };

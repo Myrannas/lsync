@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
+import { defineCollections } from "../../definition/src";
 import { CollectionTypes, type Client } from "../src";
 
 const projectSchema = z.object({
@@ -243,6 +244,37 @@ describe("CollectionTypes.builder", () => {
 
     expect(firstCalls).toEqual([{ path: "comments.review", input: { id: "first" } }]);
     expect(secondCalls).toEqual([{ path: "comments.review", input: { id: "second" } }]);
+  });
+
+  it("builds typed collection managers from shared definitions", async () => {
+    const calls: Array<{ path: string; input: unknown }> = [];
+    const definitions = defineCollections()
+      .collection("comments", (comments) =>
+        comments
+          .schema(commentSchema)
+          .key("id")
+          .api("review", (api) =>
+            api.input(z.object({ id: z.string() })).output(z.object({ accepted: z.boolean() })),
+          ),
+      )
+      .build();
+
+    const collections = CollectionTypes.from(definitions)
+      .client(
+        fakeClient({
+          call: async (path, input) => {
+            calls.push({ path, input });
+            return { accepted: true };
+          },
+        }),
+      )
+      .collection("comments", (comments) => comments.sync("on-demand"))
+      .build();
+
+    const result = await collections.comments.review({ id: "c1" });
+
+    expect(result).toEqual({ accepted: true });
+    expect(calls).toEqual([{ path: "comments.review", input: { id: "c1" } }]);
   });
 });
 

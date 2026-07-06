@@ -8,8 +8,8 @@
     "dev": "wrangler dev"
   },
   "dependencies": {
-    "lsync-server": "workspace:*",
-    "zod": "catalog:"
+    "@lfsync/example-definition": "workspace:*",
+    "lsync-server": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",

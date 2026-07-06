@@ -1,6 +1,7 @@
 export { createBatch, toChangeMessage } from "./batch";
 export { createClient } from "./client";
 export { collectionOptions } from "./collection";
+export { DefinitionCollectionTypesBuilder } from "./definition-builder";
 export { CollectionTypes, CollectionTypeBuilder } from "./collection-type-builder";
 export type {
   ChildCollectionTypeOptions,

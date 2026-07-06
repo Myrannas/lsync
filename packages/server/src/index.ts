@@ -6,6 +6,7 @@ export {
   CollectionConfigsBuilder,
   Collections,
 } from "./collection-builder";
+export { CollectionShardDefinitionBuilder, ServerCollectionBuilder } from "./definition-builder";
 export {
   and,
   compileReadExpression,
@@ -41,7 +42,9 @@ export {
   type ResolvedCollection,
 } from "./collections";
 export {
+  authorizeApiCall,
   authorizeReadQuery,
+  authorizeWriteBatch,
   readAccessDecision,
   visibleUpdateForAuth,
   type AccessStore,
@@ -68,6 +71,10 @@ export {
 export { validateBatch } from "./validation";
 export type {
   AccessAuth,
+  AccessReference,
+  AccessReferenceResolver,
+  ApiAccessContext,
+  ApiAccessHandler,
   ApiCall,
   ApiCallArgs,
   ApiCallInput,
@@ -82,25 +89,23 @@ export type {
   Batch,
   Broadcast,
   CollectionAccessConfig,
-  CollectionInvalidation,
   CollectionApiDefinition,
   CollectionApiHandlers,
+  CollectionConfig,
+  CollectionConfigs,
+  CollectionInvalidation,
+  CollectionStorageConfig,
   CollectionSubscription,
   CollectionSubscriptionInput,
   CollectionSubscriptionResult,
-  CollectionConfig,
-  CollectionConfigs,
-  CollectionStorageConfig,
   OperationType,
-  AccessReference,
-  AccessReferenceResolver,
   PushResult,
   ReadAccessContext,
   ReadAccessHandler,
   ReadAccessResult,
+  ReadCursor,
   ReadFilter,
   ReadFilterOperator,
-  ReadCursor,
   ReadOrderBy,
   ReadPredicate,
   ReadQuery,
@@ -114,5 +119,5 @@ export type {
   Update,
   WebSocketAttachment,
 } from "./types";
-export type { CollectionShardOptions, Env } from "./durable-object";
+export type { CollectionShardOptions, Env } from "./durable-object-types";
 export type { WorkerOptions } from "./worker";

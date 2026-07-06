@@ -1,8 +1,8 @@
 {
-  "name": "lsync-tanstack-db",
+  "name": "@lfsync/example-definition",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
-  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -11,17 +11,12 @@
   },
   "scripts": {},
   "dependencies": {
-    "@standard-schema/spec": "catalog:",
-    "@tanstack/db": "catalog:",
-    "@trpc/client": "catalog:",
-    "@trpc/server": "catalog:",
     "lsync-definition": "workspace:*",
-    "lsync-transport": "workspace:*"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plus": "catalog:",
-    "zod": "catalog:"
+    "vite-plus": "catalog:"
   }
 }

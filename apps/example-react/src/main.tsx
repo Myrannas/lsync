@@ -1,9 +1,9 @@
 import { BasicIndex, eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
+import { exampleCollections } from "@lfsync/example-definition";
 import { CollectionTypes } from "lsync-tanstack-db";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { z } from "zod";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Checkbox } from "./components/ui/checkbox";
@@ -18,41 +18,19 @@ import {
 } from "./components/ui/select";
 import "./styles.css";
 
-const todoSchema = z.object({
-  id: z.string(),
-  text: z.string(),
-  createdBy: z.string(),
-  completed: z.boolean(),
-});
-
-type Todo = z.infer<typeof todoSchema>;
 type TodoFilter = "open" | "completed";
 
 const shardId = new URLSearchParams(window.location.search).get("shard") ?? "demo";
 const workerUrl = import.meta.env.VITE_SYNC_URL ?? "ws://localhost:8787";
 const syncUrl = `${workerUrl.replace(/\/$/, "")}/sync/${encodeURIComponent(shardId)}`;
 
-const users = CollectionTypes.builder()
-  .name("users")
-  .schema(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-    }),
-  )
+const collections = CollectionTypes.from(exampleCollections)
   .url(syncUrl)
-  .key((user) => user.id)
-  .sync("on-demand")
-  .index("eager", BasicIndex)
+  .collection("users", (users) => users.sync("on-demand").index("eager", BasicIndex))
+  .collection("todos", (todos) => todos.sync("on-demand"))
   .build();
 
-const todos = CollectionTypes.builder()
-  .name("todos")
-  .schema(todoSchema)
-  .url(syncUrl)
-  .key((todo: Todo) => todo.id)
-  .sync("on-demand")
-  .build();
+const { todos, users } = collections;
 
 function App() {
   const [text, setText] = useState("");

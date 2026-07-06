@@ -16,6 +16,7 @@
     "paths": {
       "lsync-server": ["./packages/server/src/index.ts"],
       "lsync-server/client": ["./packages/server/src/client.ts"],
+      "lsync-definition": ["./packages/definition/src/index.ts"],
       "lsync-tanstack-db": ["./packages/tanstack-db/src/index.ts"],
       "lsync-transport": ["./packages/transport/src/index.ts"]
     }
