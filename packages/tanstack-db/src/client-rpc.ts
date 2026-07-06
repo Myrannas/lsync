@@ -1,5 +1,5 @@
 import type { ClientRpcRequest, RpcId } from "lsync-transport";
-import type { ApiCall, Batch, ReadQuery } from "./types";
+import type { ApiCall, Batch, ReadQuery, SyncChangesQuery } from "./types";
 
 export interface PendingRequest {
   resolve: (value: unknown) => void;
@@ -45,6 +45,19 @@ export function requestForOperation(
         path: "read",
         input: {
           json: op.input as ReadQuery,
+        },
+      },
+    };
+  }
+
+  if (op.type === "query" && op.path === "changes") {
+    return {
+      id,
+      method: "query",
+      params: {
+        path: "changes",
+        input: {
+          json: op.input as SyncChangesQuery,
         },
       },
     };

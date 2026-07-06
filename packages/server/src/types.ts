@@ -11,6 +11,9 @@ import type {
   ReadPredicate,
   ReadQuery,
   ReadResult,
+  SequencedUpdate,
+  SyncChangesQuery,
+  SyncChangesResult,
 } from "lsync-transport";
 import type { ReadExpressionInput, ReadExpressionRow } from "lsync-transport";
 
@@ -29,6 +32,9 @@ export {
   readPredicateSchema,
   readQuerySchema,
   readResultSchema,
+  sequencedUpdateSchema,
+  syncChangesQuerySchema,
+  syncChangesResultSchema,
   updateSchema,
   webSocketAttachmentSchema,
 } from "lsync-transport";
@@ -59,6 +65,10 @@ export type {
   ReadQuery,
   ReadQueryInput,
   ReadResult,
+  SequencedUpdate,
+  SyncChangesQuery,
+  SyncChangesQueryInput,
+  SyncChangesResult,
   Update,
   WebSocketAttachment,
 } from "lsync-transport";
@@ -112,12 +122,13 @@ export interface ApiHandlerContext {
   clientId?: string;
   auth: AccessAuth;
   validate(batch: Batch): void;
-  persist(batch: Batch): void;
-  publish(batch: Batch): void;
+  persist(batch: Batch): SequencedBatch;
+  publish(batch: SequencedBatch): void;
   subscribe(input: CollectionSubscription): CollectionSubscriptionResult;
   unsubscribe(input: CollectionSubscription): CollectionSubscriptionResult;
   mutate(batch: Batch): PushResult;
   read(query: ReadQuery): ReadResult;
+  changes(query: SyncChangesQuery): SyncChangesResult;
 }
 
 export interface ApiHandlerArgs<TInput = unknown> extends ApiHandlerContext {
@@ -131,3 +142,8 @@ export type ApiHandler<TResult = unknown, TInput = unknown> = (
 export type ApiHandlers<TApi extends ApiContract = ApiContract> = {
   [TPath in ApiPath<TApi>]: ApiHandler<ApiOutput<TApi, TPath>, ApiInput<TApi, TPath>>;
 };
+
+export interface SequencedBatch {
+  updates: Array<SequencedUpdate>;
+  watermark: number;
+}

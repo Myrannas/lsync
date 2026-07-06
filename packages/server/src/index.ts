@@ -31,6 +31,12 @@ export {
   type ResolvedCollection,
 } from "./collections";
 export { authorizeReadQuery, visibleUpdateForAuth, type ReadAccessDecision } from "./access";
+export {
+  persistSQLiteJsonBatchWithHistory,
+  readSQLiteJsonChanges,
+  type HistoryOptions,
+  type SequencedBatch,
+} from "./history";
 export { router, type Context, type Router } from "./router";
 export {
   applySQLiteJsonBatch,
@@ -78,8 +84,12 @@ export type {
   ReadPredicate,
   ReadQuery,
   ReadResult,
+  SequencedUpdate,
   SQLiteJsonIndexConfig,
   SQLiteJsonStorageConfig,
+  SyncChangesQuery,
+  SyncChangesQueryInput,
+  SyncChangesResult,
   Update,
   WebSocketAttachment,
 } from "./types";

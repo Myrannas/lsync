@@ -1,5 +1,6 @@
 import { parseClientRpcRequest, readRpcId, sendServerMessage } from "lsync-transport";
 import { authorizeReadQuery, visibleUpdateForAuth } from "./access";
+import { normalizeCollection } from "./collection-normalize";
 import { callRouter } from "./durable-object-rpc";
 import { sendRpcError, sendRpcResult } from "./messages";
 import { router } from "./router";
@@ -17,11 +18,18 @@ import {
   type PushResult,
   type ReadQuery,
   type ReadResult,
+  type SequencedBatch,
+  type SyncChangesQuery,
+  type SyncChangesResult,
   webSocketAttachmentSchema,
   type WebSocketAttachment,
 } from "./types";
-import { collectionScope, resolveCollection } from "./collections";
-import { applySQLiteJsonBatch, readSQLiteJsonRows } from "./storage";
+import { readSQLiteJsonRows } from "./storage";
+import {
+  persistSQLiteJsonBatchWithHistory,
+  readSQLiteJsonChanges,
+  type HistoryOptions,
+} from "./history";
 import { validateBatch } from "./validation";
 
 export interface Env {
@@ -32,6 +40,7 @@ export interface CollectionShardOptions<TApi extends ApiContract = ApiContract> 
   collections?: CollectionConfigs;
   api?: ApiHandlers<TApi>;
   authenticate?: (args: { clientId: string; request: Request }) => AccessAuth | Promise<AccessAuth>;
+  history?: HistoryOptions;
 }
 
 export class CollectionShardDurableObject<
@@ -84,6 +93,7 @@ export class CollectionShardDurableObject<
         subscribe: (input) => this.subscribe(ws, input),
         unsubscribe: (input) => this.unsubscribe(ws, input),
         read: (input) => this.read(input, this.auth(ws)),
+        changes: (input) => this.readChanges(input, this.auth(ws)),
         callApi: (input) => this.callApi(ws, input),
       });
 
@@ -94,19 +104,12 @@ export class CollectionShardDurableObject<
     }
   }
 
-  webSocketClose(): void {
-    // Hibernation already releases request state; no in-memory shard list is kept.
-  }
-
-  webSocketError(): void {
-    // Cloudflare will discard errored sockets. The next client reconnect creates a fresh socket.
-  }
-
-  private publish(batch: Batch): void {
+  private publish(batch: SequencedBatch): void {
     const payload: Broadcast = {
       type: "updates",
       shardId: this.shardId(),
       updates: batch.updates,
+      watermark: batch.watermark,
     };
 
     const message = {
@@ -144,8 +147,15 @@ export class CollectionShardDurableObject<
     validateBatch(batch, this.options.collections);
   }
 
-  protected persist(batch: Batch): void {
-    applySQLiteJsonBatch(this.state.storage.sql, batch, this.options.collections);
+  protected persist(batch: Batch): SequencedBatch {
+    return this.state.storage.transactionSync(() =>
+      persistSQLiteJsonBatchWithHistory(
+        this.state.storage.sql,
+        batch,
+        this.options.collections,
+        this.options.history,
+      ),
+    );
   }
 
   protected read(query: ReadQuery, auth: AccessAuth = {}): ReadResult {
@@ -155,6 +165,23 @@ export class CollectionShardDurableObject<
     }
 
     return readSQLiteJsonRows(this.state.storage.sql, authorized, this.options.collections);
+  }
+
+  protected readChanges(query: SyncChangesQuery, auth: AccessAuth = {}): SyncChangesResult {
+    const result = readSQLiteJsonChanges(this.state.storage.sql, query, this.options.collections);
+    if (result.type === "resyncRequired") {
+      return result;
+    }
+
+    return {
+      ...result,
+      updates: result.updates.flatMap((update) => {
+        const visible = visibleUpdateForAuth(update, this.options.collections, auth);
+        return visible
+          ? [{ ...visible, sequence: update.sequence, serverCreatedAt: update.serverCreatedAt }]
+          : [];
+      }),
+    };
   }
 
   private subscribe(ws: WebSocket, input: CollectionSubscription): CollectionSubscriptionResult {
@@ -189,6 +216,7 @@ export class CollectionShardDurableObject<
       unsubscribe: (input) => this.unsubscribe(ws, input),
       mutate: (input) => this.mutate(input),
       read: (input) => this.read(input, auth),
+      changes: (input) => this.readChanges(input, auth),
     };
 
     if (clientId) {
@@ -200,9 +228,9 @@ export class CollectionShardDurableObject<
 
   private mutate(batch: Batch): PushResult {
     this.validate(batch);
-    this.persist(batch);
-    this.publish(batch);
-    return { accepted: batch.updates.length };
+    const persisted = this.persist(batch);
+    this.publish(persisted);
+    return { accepted: batch.updates.length, watermark: persisted.watermark };
   }
 
   private clientId(ws: WebSocket): string | undefined {
@@ -220,7 +248,7 @@ export class CollectionShardDurableObject<
       throw new Error("Missing WebSocket attachment");
     }
 
-    const normalized = this.normalizeCollection(collection);
+    const normalized = normalizeCollection(collection, this.options.collections);
     const subscriptions = new Set(attachment.subscriptions);
     update(subscriptions, normalized);
     const next = [...subscriptions];
@@ -235,7 +263,7 @@ export class CollectionShardDurableObject<
     };
   }
 
-  private subscribedUpdates(ws: WebSocket, batch: Batch): Batch["updates"] {
+  private subscribedUpdates(ws: WebSocket, batch: SequencedBatch): SequencedBatch["updates"] {
     const attachment = this.webSocketAttachment(ws);
     if (!attachment || attachment.subscriptions.length === 0) {
       return [];
@@ -244,27 +272,15 @@ export class CollectionShardDurableObject<
     const subscriptions = new Set(attachment.subscriptions);
     const auth = this.auth(ws);
     return batch.updates.flatMap((update) => {
-      if (!subscriptions.has(this.normalizeCollection(update.collection))) {
+      if (!subscriptions.has(normalizeCollection(update.collection, this.options.collections))) {
         return [];
       }
 
       const visible = visibleUpdateForAuth(update, this.options.collections, auth);
-      return visible ? [visible] : [];
+      return visible
+        ? [{ ...visible, sequence: update.sequence, serverCreatedAt: update.serverCreatedAt }]
+        : [];
     });
-  }
-
-  private normalizeCollection(collection: string): string {
-    const configured = resolveCollection(collection, this.options.collections);
-
-    if (configured) {
-      return configured.scope;
-    }
-
-    if (this.options.collections && Object.keys(this.options.collections).length > 0) {
-      throw new Error(`Unknown collection: ${collection}`);
-    }
-
-    return collectionScope(collection);
   }
 
   private webSocketAttachment(ws: WebSocket): WebSocketAttachment | undefined {
@@ -274,14 +290,7 @@ export class CollectionShardDurableObject<
 
   private auth(ws: WebSocket): AccessAuth {
     const attachment = this.webSocketAttachment(ws);
-    if (!attachment) {
-      return {};
-    }
-
-    return {
-      clientId: attachment.clientId,
-      ...attachment.auth,
-    };
+    return attachment ? { clientId: attachment.clientId, ...attachment.auth } : {};
   }
 
   private shardId(): string {

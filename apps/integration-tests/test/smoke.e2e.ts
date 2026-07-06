@@ -47,7 +47,10 @@ describe("example app integration", () => {
     };
 
     try {
-      await expect(client.pushTodo(todo)).resolves.toEqual({ accepted: 1 });
+      await expect(client.pushTodo(todo)).resolves.toEqual({
+        accepted: 1,
+        watermark: expect.any(Number),
+      });
       await expect(client.readTodo(todo.id)).resolves.toEqual(todo);
     } catch (error) {
       throw new Error(`${String(error)}\n\n${processOutput(processes)}`);

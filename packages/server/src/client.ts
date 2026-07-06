@@ -28,5 +28,10 @@ export type {
   ReadPredicate,
   ReadQuery,
   ReadResult,
+  SequencedUpdate,
+  SequencedBatch,
+  SyncChangesQuery,
+  SyncChangesQueryInput,
+  SyncChangesResult,
   Update,
 } from "./types";
