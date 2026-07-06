@@ -1,7 +1,10 @@
-import { parseClientRpcRequest, readRpcId, sendServerMessage, type RpcId } from "lsync-transport";
+import { parseClientRpcRequest, readRpcId, sendServerMessage } from "lsync-transport";
+import { authorizeReadQuery, visibleUpdateForAuth } from "./access";
 import { callRouter } from "./durable-object-rpc";
+import { sendRpcError, sendRpcResult } from "./messages";
 import { router } from "./router";
 import {
+  type AccessAuth,
   type ApiCall,
   type ApiContract,
   type ApiHandlerArgs,
@@ -28,6 +31,7 @@ export interface Env {
 export interface CollectionShardOptions<TApi extends ApiContract = ApiContract> {
   collections?: CollectionConfigs;
   api?: ApiHandlers<TApi>;
+  authenticate?: (args: { clientId: string; request: Request }) => AccessAuth | Promise<AccessAuth>;
 }
 
 export class CollectionShardDurableObject<
@@ -50,11 +54,13 @@ export class CollectionShardDurableObject<
 
     const url = new URL(request.url);
     const clientId = url.searchParams.get("clientId") ?? crypto.randomUUID();
+    const auth = (await this.options.authenticate?.({ clientId, request })) ?? { clientId };
 
     this.state.acceptWebSocket(server);
     server.serializeAttachment({
       clientId,
       connectedAt: Date.now(),
+      auth,
       subscriptions: [],
     } satisfies WebSocketAttachment);
 
@@ -77,14 +83,14 @@ export class CollectionShardDurableObject<
         publish: (input) => this.publish(input),
         subscribe: (input) => this.subscribe(ws, input),
         unsubscribe: (input) => this.unsubscribe(ws, input),
-        read: (input) => this.read(input),
+        read: (input) => this.read(input, this.auth(ws)),
         callApi: (input) => this.callApi(ws, input),
       });
 
       const result = await callRouter(caller, request);
-      this.sendRpcResult(ws, request.id, result);
+      sendRpcResult(ws, request.id, result);
     } catch (error) {
-      this.sendRpcError(ws, readRpcId(text), error);
+      sendRpcError(ws, readRpcId(text), error);
     }
   }
 
@@ -142,8 +148,13 @@ export class CollectionShardDurableObject<
     applySQLiteJsonBatch(this.state.storage.sql, batch, this.options.collections);
   }
 
-  protected read(query: ReadQuery): ReadResult {
-    return readSQLiteJsonRows(this.state.storage.sql, query, this.options.collections);
+  protected read(query: ReadQuery, auth: AccessAuth = {}): ReadResult {
+    const authorized = authorizeReadQuery(query, this.options.collections, auth);
+    if (!authorized) {
+      return { rows: [] };
+    }
+
+    return readSQLiteJsonRows(this.state.storage.sql, authorized, this.options.collections);
   }
 
   private subscribe(ws: WebSocket, input: CollectionSubscription): CollectionSubscriptionResult {
@@ -166,16 +177,18 @@ export class CollectionShardDurableObject<
     }
 
     const clientId = this.clientId(ws);
+    const auth = this.auth(ws);
     const args: ApiHandlerArgs = {
       shardId: this.shardId(),
       input: call.input,
+      auth,
       validate: (input) => this.validate(input),
       persist: (input) => this.persist(input),
       publish: (input) => this.publish(input),
       subscribe: (input) => this.subscribe(ws, input),
       unsubscribe: (input) => this.unsubscribe(ws, input),
       mutate: (input) => this.mutate(input),
-      read: (input) => this.read(input),
+      read: (input) => this.read(input, auth),
     };
 
     if (clientId) {
@@ -229,9 +242,15 @@ export class CollectionShardDurableObject<
     }
 
     const subscriptions = new Set(attachment.subscriptions);
-    return batch.updates.filter((update) =>
-      subscriptions.has(this.normalizeCollection(update.collection)),
-    );
+    const auth = this.auth(ws);
+    return batch.updates.flatMap((update) => {
+      if (!subscriptions.has(this.normalizeCollection(update.collection))) {
+        return [];
+      }
+
+      const visible = visibleUpdateForAuth(update, this.options.collections, auth);
+      return visible ? [visible] : [];
+    });
   }
 
   private normalizeCollection(collection: string): string {
@@ -253,29 +272,19 @@ export class CollectionShardDurableObject<
     return result.success ? result.data : undefined;
   }
 
+  private auth(ws: WebSocket): AccessAuth {
+    const attachment = this.webSocketAttachment(ws);
+    if (!attachment) {
+      return {};
+    }
+
+    return {
+      clientId: attachment.clientId,
+      ...attachment.auth,
+    };
+  }
+
   private shardId(): string {
     return this.state.id.toString();
-  }
-
-  private sendRpcResult(ws: WebSocket, id: RpcId, result: unknown): void {
-    sendServerMessage(ws, {
-      id,
-      result: {
-        type: "data",
-        data: {
-          json: result,
-        },
-      },
-    });
-  }
-
-  private sendRpcError(ws: WebSocket, id: RpcId, error: unknown): void {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    sendServerMessage(ws, {
-      id,
-      error: {
-        message,
-      },
-    });
   }
 }

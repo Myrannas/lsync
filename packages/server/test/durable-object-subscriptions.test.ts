@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
+import { eq } from "../src";
 import { CollectionShardDurableObject, type CollectionShardOptions } from "../src/durable-object";
 import type { Batch, WebSocketAttachment } from "../src/types";
 
@@ -59,6 +60,50 @@ describe("CollectionShardDurableObject subscriptions", () => {
     expect(subscriptionMessages(unsubscribed)).toEqual([]);
   });
 
+  it("filters subscribed updates through read access rules", async () => {
+    const pusher = fakeSocket("pusher", ["/todos/"], { userId: "u1" });
+    const previousOwner = fakeSocket("previous-owner", ["/todos/"], { userId: "u1" });
+    const nextOwner = fakeSocket("next-owner", ["/todos/"], { userId: "u2" });
+    const { object } = setup([pusher, previousOwner, nextOwner], {
+      collections: {
+        "/todos/": {
+          schema: z.object({
+            id: z.string(),
+            ownerId: z.string(),
+          }),
+          access: {
+            read: ({ auth, row }) => eq(row.ownerId, auth.userId),
+          },
+        },
+      },
+    });
+
+    await object.webSocketMessage(pusher as never, rpc("1", "push", ownershipTransfer()));
+
+    expect(subscriptionUpdates(previousOwner)).toEqual([
+      {
+        id: "owner-change",
+        collection: "/todos/",
+        key: "t1",
+        type: "delete",
+        clientId: "pusher",
+        createdAt: 1,
+      },
+    ]);
+    expect(subscriptionUpdates(nextOwner)).toEqual([
+      {
+        id: "owner-change",
+        collection: "/todos/",
+        key: "t1",
+        type: "insert",
+        value: { id: "t1", ownerId: "u2" },
+        previousValue: { id: "t1", ownerId: "u1" },
+        clientId: "pusher",
+        createdAt: 1,
+      },
+    ]);
+  });
+
   it("rejects unknown subscription collections when collections are configured", async () => {
     const { object, socket } = setup(undefined, {
       collections: {
@@ -101,10 +146,15 @@ function setup(
   };
 }
 
-function fakeSocket(clientId: string, subscriptions: Array<string> = []): FakeSocket {
+function fakeSocket(
+  clientId: string,
+  subscriptions: Array<string> = [],
+  auth?: Record<string, unknown>,
+): FakeSocket {
   return new FakeSocket({
     clientId,
     connectedAt: 1000,
+    ...(auth ? { auth } : {}),
     subscriptions,
   });
 }
@@ -177,6 +227,23 @@ function mixedBatch(): Batch {
         key: "p1",
         type: "insert",
         value: { id: "p1" },
+        createdAt: 1,
+      },
+    ],
+  };
+}
+
+function ownershipTransfer(): Batch {
+  return {
+    updates: [
+      {
+        id: "owner-change",
+        collection: "/todos/",
+        key: "t1",
+        type: "update",
+        value: { id: "t1", ownerId: "u2" },
+        previousValue: { id: "t1", ownerId: "u1" },
+        clientId: "pusher",
         createdAt: 1,
       },
     ],

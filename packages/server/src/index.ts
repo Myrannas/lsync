@@ -1,4 +1,28 @@
 export { CollectionShardDurableObject } from "./durable-object";
+export {
+  and,
+  compileReadExpression,
+  eq,
+  field,
+  gt,
+  gte,
+  inArray,
+  lt,
+  lte,
+  matchesReadPredicate,
+  ne,
+  not,
+  or,
+  readExpressionRow,
+  val,
+  type FuncExpression,
+  type ReadExpression,
+  type ReadExpressionField,
+  type ReadExpressionInput,
+  type ReadExpressionRow,
+  type RefExpression,
+  type ValExpression,
+} from "lsync-transport";
 export { createWorkerHandler } from "./worker";
 export {
   collectionScope,
@@ -6,6 +30,7 @@ export {
   resolveCollection,
   type ResolvedCollection,
 } from "./collections";
+export { authorizeReadQuery, visibleUpdateForAuth, type ReadAccessDecision } from "./access";
 export { router, type Context, type Router } from "./router";
 export {
   applySQLiteJsonBatch,
@@ -19,6 +44,7 @@ export {
 } from "./storage";
 export { validateBatch } from "./validation";
 export type {
+  AccessAuth,
   ApiCall,
   ApiCallArgs,
   ApiCallInput,
@@ -33,6 +59,7 @@ export type {
   ApiRoute,
   Batch,
   Broadcast,
+  CollectionAccessConfig,
   CollectionSubscription,
   CollectionSubscriptionInput,
   CollectionSubscriptionResult,
@@ -41,6 +68,9 @@ export type {
   CollectionStorageConfig,
   OperationType,
   PushResult,
+  ReadAccessContext,
+  ReadAccessHandler,
+  ReadAccessResult,
   ReadFilter,
   ReadFilterOperator,
   ReadCursor,

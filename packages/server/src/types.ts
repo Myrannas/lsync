@@ -8,9 +8,11 @@ import type {
   CollectionSubscription,
   CollectionSubscriptionResult,
   PushResult,
+  ReadPredicate,
   ReadQuery,
   ReadResult,
 } from "lsync-transport";
+import type { ReadExpressionInput, ReadExpressionRow } from "lsync-transport";
 
 export {
   apiCallSchema,
@@ -61,8 +63,31 @@ export type {
   WebSocketAttachment,
 } from "lsync-transport";
 
-export interface CollectionConfig {
+export type AccessAuth = Record<string, unknown> & {
+  clientId?: string;
+};
+
+export interface ReadAccessContext<T extends object = Record<string, unknown>> {
+  auth: AccessAuth;
+  collection: string;
+  params: Record<string, string>;
+  pattern: string;
+  row: ReadExpressionRow<T>;
+}
+
+export type ReadAccessResult = boolean | ReadPredicate | ReadExpressionInput;
+
+export type ReadAccessHandler<T extends object = Record<string, unknown>> = (
+  context: ReadAccessContext<T>,
+) => ReadAccessResult;
+
+export interface CollectionAccessConfig<T extends object = Record<string, unknown>> {
+  read?: ReadAccessHandler<T>;
+}
+
+export interface CollectionConfig<T extends object = Record<string, unknown>> {
   schema: z.ZodTypeAny;
+  access?: CollectionAccessConfig<T>;
   storage?: CollectionStorageConfig;
   initialData?: Array<Record<string, unknown>>;
 }
@@ -85,6 +110,7 @@ export type CollectionStorageConfig = SQLiteJsonStorageConfig;
 export interface ApiHandlerContext {
   shardId: string;
   clientId?: string;
+  auth: AccessAuth;
   validate(batch: Batch): void;
   persist(batch: Batch): void;
   publish(batch: Batch): void;
