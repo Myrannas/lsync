@@ -46,6 +46,31 @@ export {
 } from "./api";
 
 export {
+  and,
+  compileReadExpression,
+  eq,
+  field,
+  gt,
+  gte,
+  inArray,
+  lt,
+  lte,
+  ne,
+  not,
+  or,
+  readExpressionRow,
+  val,
+  type FuncExpression,
+  type ReadExpression,
+  type ReadExpressionField,
+  type ReadExpressionInput,
+  type ReadExpressionRow,
+  type RefExpression,
+  type ValExpression,
+} from "./expression";
+export { matchesReadPredicate } from "./predicate-match";
+
+export {
   clientRpcRequestSchema,
   encodeClientRpcRequest,
   encodeServerMessage,

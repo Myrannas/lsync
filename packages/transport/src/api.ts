@@ -106,6 +106,7 @@ export const broadcastSchema = z.object({
 export const webSocketAttachmentSchema = z.object({
   clientId: z.string(),
   connectedAt: z.number(),
+  auth: z.record(z.string(), z.unknown()).optional(),
   subscriptions: z.array(z.string()).default([]),
 });
 
