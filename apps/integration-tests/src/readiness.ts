@@ -19,18 +19,19 @@ export async function waitForHttpOk(url: string, options: WaitOptions): Promise<
   );
 }
 
-export async function waitForWebSocket(url: string, options: WaitOptions): Promise<void> {
+export async function waitForHttpStatus(
+  url: string,
+  status: number,
+  options: WaitOptions,
+): Promise<void> {
   await waitFor(
-    () =>
-      new Promise<void>((resolve, reject) => {
-        const ws = new WebSocket(url);
-        ws.addEventListener("open", () => {
-          ws.close();
-          resolve();
-        });
-        ws.addEventListener("error", () => reject(new Error(`Unable to open ${url}`)));
-      }),
-    `WebSocket readiness timed out for ${url}`,
+    async () => {
+      const response = await fetch(url);
+      if (response.status !== status) {
+        throw new Error(`Expected HTTP ${status} from ${url}, received ${response.status}`);
+      }
+    },
+    `HTTP readiness timed out for ${url}`,
     options,
   );
 }

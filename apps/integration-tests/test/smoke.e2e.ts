@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { startManagedProcess, type ManagedProcess } from "../src/processes";
-import { processOutput, waitForHttpOk, waitForWebSocket } from "../src/readiness";
+import { processOutput, waitForHttpOk, waitForHttpStatus } from "../src/readiness";
 import { openSyncClient } from "../src/sync-client";
 
 const workspaceRoot = new URL("../../..", import.meta.url).pathname;
@@ -11,6 +11,7 @@ const workerPort = Number(process.env.E2E_WORKER_PORT ?? 18_787);
 const frontendPort = Number(process.env.E2E_FRONTEND_PORT ?? 15_173);
 const shardId = `e2e-${Date.now()}`;
 const workerUrl = `ws://127.0.0.1:${workerPort}`;
+const workerHttpUrl = `http://127.0.0.1:${workerPort}/`;
 const syncUrl = `${workerUrl}/sync/${encodeURIComponent(shardId)}?clientId=e2e`;
 const frontendUrl = `http://127.0.0.1:${frontendPort}/?shard=${encodeURIComponent(shardId)}`;
 
@@ -85,7 +86,7 @@ async function startExampleStack(): Promise<void> {
     }),
   );
 
-  await waitForWebSocket(syncUrl, { timeoutMs: 20_000 });
+  await waitForHttpStatus(workerHttpUrl, 404, { timeoutMs: 20_000 });
 
   processes.push(
     startManagedProcess({
