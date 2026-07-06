@@ -9,6 +9,8 @@ import type {
 } from "./types";
 import { resolveCollection } from "./collections";
 import { ensureSQLiteJsonTables, type SqlStorageLike, type SqlStorageValue } from "./storage";
+import sqlTag, { join, type Sql } from "sql-template-tag";
+import { execSql, identifierSql, rawSql } from "./sqlite-sql";
 
 export function readSQLiteJsonRows(
   sql: SqlStorageLike,
@@ -87,33 +89,27 @@ function selectRows(
   table: string,
   options: SelectRowsOptions,
 ): Array<{ key: string; value: string }> {
-  const bindings: Array<SqlStorageValue> = [];
-  const where = ["path = ?"];
-  bindings.push(options.scope);
+  const where = [sqlTag`path = ${options.scope}`];
 
-  where.push(...options.filters.map((filter) => filterSql(filter, bindings)));
+  where.push(...options.filters.map((filter) => filterSql(filter)));
   if (options.predicate) {
-    where.push(predicateSql(options.predicate, bindings));
+    where.push(predicateSql(options.predicate));
   }
 
   const order =
     options.orderBy.length > 0
-      ? options.orderBy.map((item) => orderBySql(item, bindings)).join(", ")
-      : "key";
+      ? join(options.orderBy.map((item) => orderBySql(item)))
+      : sqlTag`key`;
 
-  bindings.push(options.limit ?? 1000, options.offset ?? 0);
-
-  return sql
-    .exec<{ key: string; value: string }>(
-      `
-        SELECT key, value FROM ${quoteIdentifier(table)}
-        ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
+  return execSql<{ key: string; value: string }>(
+    sql,
+    sqlTag`
+        SELECT key, value FROM ${identifierSql(table)}
+        WHERE ${join(where, " AND ")}
         ORDER BY ${order}
-        LIMIT ? OFFSET ?
+        LIMIT ${options.limit ?? 1000} OFFSET ${options.offset ?? 0}
       `,
-      ...bindings,
-    )
-    .toArray();
+  ).toArray();
 }
 
 function uniqueRows(
@@ -134,10 +130,6 @@ function tableName(collectionName: string, storage: SQLiteJsonStorageConfig): st
   return storage.tableName ?? collectionName;
 }
 
-function quoteIdentifier(identifier: string): string {
-  return `"${identifier.replaceAll(`"`, `""`)}"`;
-}
-
 function jsonPath(field: string): string {
   if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(field)) {
     throw new Error(`Invalid JSON index field: ${field}`);
@@ -146,19 +138,21 @@ function jsonPath(field: string): string {
   return `$.${field}`;
 }
 
-function orderBySql(orderBy: ReadOrderBy, bindings: Array<SqlStorageValue>): string {
+function orderBySql(orderBy: ReadOrderBy): Sql {
   const direction = orderBy.direction === "desc" ? "DESC" : "ASC";
-  bindings.push(jsonPath(orderBy.field));
-  return `json_extract(value, ?) ${direction}`;
+  return sqlTag`json_extract(value, ${jsonPath(orderBy.field)}) ${directionSql(direction)}`;
 }
 
-function predicateSql(predicate: ReadPredicate, bindings: Array<SqlStorageValue>): string {
+function predicateSql(predicate: ReadPredicate): Sql {
   if (predicate.type === "comparison") {
-    return filterSql(predicate, bindings);
+    return filterSql(predicate);
   }
 
   const joiner = predicate.type === "and" ? " AND " : " OR ";
-  return `(${predicate.predicates.map((child) => predicateSql(child, bindings)).join(joiner)})`;
+  return sqlTag`(${join(
+    predicate.predicates.map((child) => predicateSql(child)),
+    joiner,
+  )})`;
 }
 
 function combinePredicates(
@@ -170,41 +164,42 @@ function combinePredicates(
   return { type: "and", predicates: [left, right] };
 }
 
-function filterSql(filter: ReadFilter, bindings: Array<SqlStorageValue>): string {
-  const field = "json_extract(value, ?)";
-  bindings.push(jsonPath(filter.field));
+function filterSql(filter: ReadFilter): Sql {
+  const field = sqlTag`json_extract(value, ${jsonPath(filter.field)})`;
 
   if (filter.op === "in") {
     if (!Array.isArray(filter.value) || filter.value.length === 0) {
       throw new Error("The in filter requires a non-empty array value");
     }
 
-    bindings.push(...filter.value.map(toSqlJsonValue));
-    return `${field} IN (${filter.value.map(() => "?").join(", ")})`;
+    return sqlTag`${field} IN (${join(filter.value.map(toSqlJsonValue))})`;
   }
 
   const value = toSqlJsonValue(filter.value);
-  bindings.push(value);
 
   if (value === null) {
-    if (filter.op === "eq") return `${field} IS ?`;
-    if (filter.op === "ne") return `${field} IS NOT ?`;
+    if (filter.op === "eq") return sqlTag`${field} IS ${value}`;
+    if (filter.op === "ne") return sqlTag`${field} IS NOT ${value}`;
   }
 
   switch (filter.op) {
     case "eq":
-      return `${field} = ?`;
+      return sqlTag`${field} = ${value}`;
     case "ne":
-      return `${field} != ?`;
+      return sqlTag`${field} != ${value}`;
     case "gt":
-      return `${field} > ?`;
+      return sqlTag`${field} > ${value}`;
     case "gte":
-      return `${field} >= ?`;
+      return sqlTag`${field} >= ${value}`;
     case "lt":
-      return `${field} < ?`;
+      return sqlTag`${field} < ${value}`;
     case "lte":
-      return `${field} <= ?`;
+      return sqlTag`${field} <= ${value}`;
   }
+}
+
+function directionSql(direction: "ASC" | "DESC"): Sql {
+  return rawSql(direction);
 }
 
 function toSqlJsonValue(value: unknown): SqlStorageValue {
