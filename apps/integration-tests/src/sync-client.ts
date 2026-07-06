@@ -24,9 +24,15 @@ export interface TodoRow {
   completed: boolean;
 }
 
+export interface UserRow {
+  id: string;
+  name: string;
+}
+
 export interface SyncClient {
   pushTodo(todo: TodoRow): Promise<{ accepted: number }>;
   readTodo(id: string): Promise<TodoRow | undefined>;
+  readUser(id: string): Promise<UserRow | undefined>;
   close(): void;
 }
 
@@ -51,6 +57,14 @@ export async function openSyncClient(url: string): Promise<SyncClient> {
     async readTodo(id) {
       const result = await request<{ rows: Array<TodoRow> }>(ws, "read", {
         collection: "todos",
+        filters: [{ field: "id", op: "eq", value: id }],
+        limit: 1,
+      });
+      return result.rows[0];
+    },
+    async readUser(id) {
+      const result = await request<{ rows: Array<UserRow> }>(ws, "read", {
+        collection: "users",
         filters: [{ field: "id", op: "eq", value: id }],
         limit: 1,
       });

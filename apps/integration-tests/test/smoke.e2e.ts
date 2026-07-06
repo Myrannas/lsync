@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { startManagedProcess, type ManagedProcess } from "../src/processes";
-import { processOutput, waitForHttpOk, waitForHttpStatus } from "../src/readiness";
+import { processOutput, waitFor, waitForHttpOk, waitForHttpStatus } from "../src/readiness";
 import { openSyncClient } from "../src/sync-client";
 
 const workspaceRoot = new URL("../../..", import.meta.url).pathname;
@@ -87,6 +87,7 @@ async function startExampleStack(): Promise<void> {
   );
 
   await waitForHttpStatus(workerHttpUrl, 404, { timeoutMs: 20_000 });
+  await waitForConfiguredSyncWorker();
 
   processes.push(
     startManagedProcess({
@@ -111,4 +112,25 @@ async function startExampleStack(): Promise<void> {
   );
 
   frontendHtml = await waitForHttpOk(frontendUrl, { timeoutMs: 20_000 });
+}
+
+async function waitForConfiguredSyncWorker(): Promise<void> {
+  await waitFor(
+    async () => {
+      const probeShard = `probe-${Date.now()}-${crypto.randomUUID()}`;
+      const probeUrl = `${workerUrl}/sync/${encodeURIComponent(probeShard)}?clientId=e2e-probe`;
+      const client = await openSyncClient(probeUrl);
+
+      try {
+        const user = await client.readUser("current-user");
+        if (user?.name !== "Current user") {
+          throw new Error("Expected initial current-user row from configured worker");
+        }
+      } finally {
+        client.close();
+      }
+    },
+    "Configured sync worker readiness timed out",
+    { timeoutMs: 20_000 },
+  );
 }

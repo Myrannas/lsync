@@ -43,7 +43,7 @@ export function processOutput(processes: Array<ManagedProcess>): string {
     .join("\n");
 }
 
-async function waitFor<T>(
+export async function waitFor<T>(
   attempt: () => Promise<T>,
   timeoutMessage: string,
   options: WaitOptions,
