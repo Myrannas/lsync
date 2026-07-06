@@ -1,5 +1,12 @@
 export { CollectionShardDurableObject } from "./durable-object";
 export {
+  collectionBuilder,
+  collectionConfigsBuilder,
+  CollectionBuilder,
+  CollectionConfigsBuilder,
+  Collections,
+} from "./collection-builder";
+export {
   and,
   compileReadExpression,
   eq,
@@ -26,7 +33,9 @@ export {
 } from "lsync-transport";
 export { createWorkerHandler } from "./worker";
 export {
+  collectionApiHandlers,
   collectionScope,
+  defaultCollectionApiPath,
   isCollectionPattern,
   resolveCollection,
   type ResolvedCollection,
@@ -66,7 +75,6 @@ export type {
   ApiHandler,
   ApiHandlerArgs,
   ApiHandlerContext,
-  ApiHandlers,
   ApiInput,
   ApiOutput,
   ApiPath,
@@ -75,6 +83,8 @@ export type {
   Broadcast,
   CollectionAccessConfig,
   CollectionInvalidation,
+  CollectionApiDefinition,
+  CollectionApiHandlers,
   CollectionSubscription,
   CollectionSubscriptionInput,
   CollectionSubscriptionResult,

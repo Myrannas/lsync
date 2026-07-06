@@ -8,7 +8,12 @@ import type {
   SQLiteJsonStorageConfig,
 } from "./types";
 import { resolveCollection } from "./collections";
-import { ensureSQLiteJsonTables, type SqlStorageLike, type SqlStorageValue } from "./storage";
+import {
+  ensureSQLiteJsonTables,
+  sqliteJsonStorage,
+  type SqlStorageLike,
+  type SqlStorageValue,
+} from "./storage";
 import sqlTag, { join, type Sql } from "sql-template-tag";
 import { execSql, identifierSql, rawSql } from "./sqlite-sql";
 
@@ -28,11 +33,12 @@ export function readSQLiteJsonRows(
     throw new Error(`Cannot read unconfigured collection: ${query.collection}`);
   }
 
-  if (resolved.collection.storage?.kind !== "sqlite-json") {
+  const storage = sqliteJsonStorage(resolved.collection.storage);
+  if (!storage) {
     throw new Error(`Collection is not readable with SQLite JSON storage: ${query.collection}`);
   }
 
-  const table = tableName(resolved.name, resolved.collection.storage);
+  const table = tableName(resolved.name, storage);
   const filters = query.filters ?? [];
   const predicate = query.predicate;
   const orderBy = query.orderBy ?? [];

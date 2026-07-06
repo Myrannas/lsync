@@ -1,6 +1,7 @@
 import type {
   Batch,
   CollectionConfigs,
+  CollectionStorageConfig,
   SQLiteJsonIndexConfig,
   SQLiteJsonStorageConfig,
 } from "./types";
@@ -43,11 +44,12 @@ export function ensureSQLiteJsonTables(
   collections: CollectionConfigs = {},
 ): void {
   for (const [collectionName, collection] of Object.entries(collections)) {
-    if (collection.storage?.kind !== "sqlite-json") {
+    const storage = sqliteJsonStorage(collection.storage);
+    if (!storage) {
       continue;
     }
 
-    const table = tableName(collectionName, collection.storage);
+    const table = tableName(collectionName, storage);
     const result = execSql(
       sql,
       sqlTag`
@@ -63,7 +65,7 @@ export function ensureSQLiteJsonTables(
     `,
     );
 
-    for (const index of collection.storage.indexes) {
+    for (const index of storage.indexes) {
       execSql(sql, createIndexSql(table, index));
     }
 
@@ -98,12 +100,13 @@ export function applySQLiteJsonBatch(
 
   for (const update of batch.updates) {
     const resolved = resolveCollection(update.collection, collections);
+    const storage = resolved ? sqliteJsonStorage(resolved.collection.storage) : undefined;
 
-    if (resolved?.collection.storage?.kind !== "sqlite-json") {
+    if (!resolved || !storage) {
       continue;
     }
 
-    const table = tableName(resolved.name, resolved.collection.storage);
+    const table = tableName(resolved.name, storage);
     const key = String(update.key);
     const scope = resolved.scope;
     const updatedAt = new Date(update.createdAt).toISOString();
@@ -148,6 +151,16 @@ export function applySQLiteJsonBatch(
       `,
     );
   }
+}
+
+export function sqliteJsonStorage(
+  storage: CollectionStorageConfig | undefined,
+): SQLiteJsonStorageConfig | undefined {
+  if (!storage) {
+    return sqliteJsonTable();
+  }
+
+  return storage.kind === "sqlite-json" ? storage : undefined;
 }
 
 function whereKeySql(scope: string, key: string): Sql {
