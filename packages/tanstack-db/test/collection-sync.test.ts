@@ -183,6 +183,67 @@ describe("collectionOptions sync", () => {
       },
     ]);
   });
+
+  it("clears tracked on-demand rows when the subscribed collection is invalidated", async () => {
+    let listener: ((broadcast: Broadcast) => void) | undefined;
+    const rows = new Map<string, Todo>();
+    const writes: Array<unknown> = [];
+    const client: Client = {
+      clientId: "client-1",
+      push: async (batch) => ({ accepted: batch.updates.length, watermark: 0 }),
+      read: async () => ({
+        rows: [{ id: "1", text: "Write tests", completed: false }],
+      }),
+      changes: async () => ({ type: "changes", updates: [], watermark: 0, hasMore: false }),
+      call: async () => undefined,
+      subscribe: (_collection, next) => {
+        listener = next;
+        return {
+          ready: Promise.resolve(),
+          unsubscribe: () => {},
+        };
+      },
+      close: () => {},
+    };
+    const options = collectionOptions({
+      id: "todos",
+      collection: "todos",
+      client,
+      getKey: (todo: Todo) => todo.id,
+      schema: todoSchema,
+      syncMode: "on-demand",
+    });
+    const sync = options.sync.sync({
+      begin: () => {},
+      write: (message: { key: string; type: string; value?: Partial<Todo> }) => {
+        writes.push(message);
+        if (message.type === "delete") {
+          rows.delete(message.key);
+        }
+      },
+      commit: () => {},
+      markReady: () => {},
+      truncate: () => {},
+      collection: {
+        has: (key: string) => rows.has(key),
+        get: (key: string) => rows.get(key),
+      },
+    } as never) as { loadSubset: (options: LoadSubsetOptions) => true | Promise<void> };
+
+    await sync.loadSubset({ where: completedEquals(false) } as LoadSubsetOptions);
+    rows.set("1", { id: "1", text: "Write tests", completed: false });
+    writes.length = 0;
+
+    listener?.({
+      type: "updates",
+      shardId: "shard-1",
+      watermark: 1,
+      invalidations: [{ collection: "todos" }],
+      updates: [],
+    });
+
+    expect(writes).toEqual([{ type: "delete", key: "1" }]);
+  });
 });
 
 function syncContext() {

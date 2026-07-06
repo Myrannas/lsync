@@ -104,6 +104,10 @@ export function collectionOptions<
           );
         };
         const subscription = client.subscribe(options.collection, (broadcast) => {
+          if ((broadcast.invalidations ?? []).length > 0 && options.syncMode === "on-demand") {
+            deleteKeys(subsets.clear());
+          }
+
           const changes = broadcast.updates.flatMap((update) => {
             if (update.collection !== options.collection) return [];
             const ownUpdate = update.clientId === client.clientId;

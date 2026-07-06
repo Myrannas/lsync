@@ -144,9 +144,11 @@ export class SubsetTracker<T extends object, TKey extends string | number> {
     return this.releaseKeys(subset.keys);
   }
 
-  clear(): void {
+  clear(): Array<TKey> {
+    const keys = [...this.keyRefs.keys()];
     this.subsets.clear();
     this.keyRefs.clear();
+    return keys;
   }
 
   private addKeys(keys: Set<TKey>): void {

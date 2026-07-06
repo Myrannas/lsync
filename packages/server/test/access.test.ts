@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { and, authorizeReadQuery, eq, visibleUpdateForAuth } from "../src";
+import {
+  and,
+  authorizeReadQuery,
+  eq,
+  inArray,
+  readAccessDecision,
+  visibleUpdateForAuth,
+} from "../src";
 import type { CollectionConfigs, Update } from "../src";
 
 const collections: CollectionConfigs = {
+  "/projects/": {
+    schema: z.object({
+      id: z.string(),
+      memberIds: z.array(z.string()),
+      orgId: z.string(),
+    }),
+  },
   "/projects/{projectId}/todos/": {
     schema: z.object({
       id: z.string(),
@@ -12,10 +26,25 @@ const collections: CollectionConfigs = {
       completed: z.boolean(),
     }),
     access: {
+      references: {
+        project: ({ params }) => `/projects/${params.projectId}`,
+      },
       read: ({ auth, params, row }) =>
         and(eq(row.projectId, params.projectId), eq(row.ownerId, auth.userId)),
     },
   },
+};
+
+const store = {
+  read: (_collection: string, _key: string | number) => undefined,
+};
+
+const referenceStore = {
+  read: (_collection: string, _key: string | number) => ({
+    id: "p1",
+    memberIds: ["u1"],
+    orgId: "o1",
+  }),
 };
 
 describe("read access", () => {
@@ -27,6 +56,7 @@ describe("read access", () => {
       },
       collections,
       { userId: "u1" },
+      store,
     );
 
     expect(query).toEqual({
@@ -55,6 +85,7 @@ describe("read access", () => {
       }),
       collections,
       { userId: "u1" },
+      store,
     );
 
     expect(update).toEqual({
@@ -74,6 +105,7 @@ describe("read access", () => {
       }),
       collections,
       { userId: "u1" },
+      store,
     );
 
     expect(update).toMatchObject({
@@ -81,6 +113,46 @@ describe("read access", () => {
       type: "insert",
       value: { id: "t1", ownerId: "u1", projectId: "p1", completed: false },
     });
+  });
+
+  it("reduces reference expressions into row predicates and tracks reference fields", () => {
+    const referenceCollections: CollectionConfigs = {
+      ...collections,
+      "/projects/{projectId}/todos/": {
+        ...collections["/projects/{projectId}/todos/"]!,
+        access: {
+          references: {
+            project: ({ params }) => `/projects/${params.projectId}`,
+          },
+          read: ({ auth, references, row }) =>
+            and(
+              eq(references.project.orgId, auth.orgId),
+              inArray(auth.userId, references.project.memberIds),
+              eq(row.projectId, references.project.id),
+            ),
+        },
+      },
+    };
+
+    const decision = readAccessDecision(
+      "/projects/p1/todos/",
+      referenceCollections,
+      { orgId: "o1", userId: "u1" },
+      referenceStore,
+    );
+
+    expect(decision.allow).toBe(true);
+    expect(decision.predicate).toEqual({
+      type: "comparison",
+      field: "projectId",
+      op: "eq",
+      value: "p1",
+    });
+    expect(decision.dependencies).toEqual([
+      { collection: "/projects/", field: "orgId", key: "p1", name: "project" },
+      { collection: "/projects/", field: "memberIds", key: "p1", name: "project" },
+      { collection: "/projects/", field: "id", key: "p1", name: "project" },
+    ]);
   });
 });
 

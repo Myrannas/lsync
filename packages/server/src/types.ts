@@ -8,7 +8,6 @@ import type {
   CollectionSubscription,
   CollectionSubscriptionResult,
   PushResult,
-  ReadPredicate,
   ReadQuery,
   ReadResult,
   SequencedUpdate,
@@ -49,6 +48,7 @@ export type {
   ApiRoute,
   Batch,
   Broadcast,
+  CollectionInvalidation,
   CollectionSubscription,
   CollectionSubscriptionInput,
   CollectionSubscriptionResult,
@@ -80,18 +80,34 @@ export type AccessAuth = Record<string, unknown> & {
 export interface ReadAccessContext<T extends object = Record<string, unknown>> {
   auth: AccessAuth;
   collection: string;
+  references: Record<string, ReadExpressionRow<Record<string, unknown>>>;
   params: Record<string, string>;
   pattern: string;
   row: ReadExpressionRow<T>;
 }
 
-export type ReadAccessResult = boolean | ReadPredicate | ReadExpressionInput;
+export type AccessReference =
+  | string
+  | {
+      collection: string;
+      key: string | number;
+    };
+
+export type AccessReferenceResolver = (context: {
+  auth: AccessAuth;
+  collection: string;
+  params: Record<string, string>;
+  pattern: string;
+}) => AccessReference;
+
+export type ReadAccessResult = ReadExpressionInput;
 
 export type ReadAccessHandler<T extends object = Record<string, unknown>> = (
   context: ReadAccessContext<T>,
 ) => ReadAccessResult;
 
 export interface CollectionAccessConfig<T extends object = Record<string, unknown>> {
+  references?: Record<string, AccessReferenceResolver>;
   read?: ReadAccessHandler<T>;
 }
 

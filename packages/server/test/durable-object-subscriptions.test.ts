@@ -1,18 +1,21 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import {
-  encodeClientRpcRequest,
-  parseServerMessage,
-  type ClientRpcRequest,
-  type ServerMessage,
-} from "../../transport/src/rpc";
 import { eq } from "../src";
-import { CollectionShardDurableObject, type CollectionShardOptions } from "../src/durable-object";
-import type { Batch, WebSocketAttachment } from "../src/types";
-import { FakeSql } from "./storage-test-utils";
-
-type TestMessage = ServerMessage;
-type SubscriptionTestMessage = Extract<ServerMessage, { method: "subscription" }>;
+import {
+  fakeSocket,
+  mixedBatch,
+  ownershipTransfer,
+  parseMessage,
+  projectNameChange,
+  projectOrgChange,
+  referenceAccessOptions,
+  rpc,
+  setup,
+  subscriptionInvalidations,
+  subscriptionKeys,
+  subscriptionMessages,
+  subscriptionUpdates,
+} from "./durable-object-subscriptions-fixtures";
 
 describe("CollectionShardDurableObject subscriptions", () => {
   it("stores collection subscriptions in the WebSocket attachment", async () => {
@@ -88,6 +91,26 @@ describe("CollectionShardDurableObject subscriptions", () => {
     ]);
   });
 
+  it("does not invalidate children when referenced access fields are unchanged", async () => {
+    const pusher = fakeSocket("pusher", ["/projects/"]);
+    const child = fakeSocket("child", ["/projects/p1/todos/"], { orgId: "o1" });
+    const { object } = setup([pusher, child], referenceAccessOptions());
+
+    await object.webSocketMessage(pusher as never, rpc("1", "push", projectNameChange()));
+
+    expect(subscriptionMessages(child)).toEqual([]);
+  });
+
+  it("invalidates children when referenced access fields change", async () => {
+    const pusher = fakeSocket("pusher", ["/projects/"]);
+    const child = fakeSocket("child", ["/projects/p1/todos/"], { orgId: "o1" });
+    const { object } = setup([pusher, child], referenceAccessOptions());
+
+    await object.webSocketMessage(pusher as never, rpc("1", "push", projectOrgChange()));
+
+    expect(subscriptionInvalidations(child)).toEqual([{ collection: "/projects/p1/todos/" }]);
+  });
+
   it("rejects unknown subscription collections when collections are configured", async () => {
     const { object, socket } = setup(undefined, {
       collections: {
@@ -110,154 +133,3 @@ describe("CollectionShardDurableObject subscriptions", () => {
     });
   });
 });
-
-function setup(
-  sockets: Array<FakeSocket> = [fakeSocket("client")],
-  options?: CollectionShardOptions,
-) {
-  const state = {
-    id: {
-      toString: () => "shard-1",
-    },
-    storage: {
-      sql: new FakeSql(),
-      transactionSync: (callback: () => unknown) => callback(),
-    },
-    getWebSockets: () => sockets as never,
-  };
-  return {
-    object: new CollectionShardDurableObject(state as never, {} as never, options),
-    socket: sockets[0],
-  };
-}
-
-function fakeSocket(
-  clientId: string,
-  subscriptions: Array<string> = [],
-  auth?: Record<string, unknown>,
-): FakeSocket {
-  return new FakeSocket({
-    clientId,
-    connectedAt: 1000,
-    ...(auth ? { auth } : {}),
-    subscriptions,
-  });
-}
-
-class FakeSocket {
-  readonly messages: Array<ArrayBuffer> = [];
-
-  constructor(private attachment: WebSocketAttachment) {}
-
-  send(data: ArrayBuffer): void {
-    this.messages.push(data);
-  }
-
-  serializeAttachment(attachment: WebSocketAttachment): void {
-    this.attachment = attachment;
-  }
-
-  deserializeAttachment(): WebSocketAttachment {
-    return this.attachment;
-  }
-}
-
-function rpc(id: string, path: "push", json: Batch): ArrayBuffer;
-function rpc(
-  id: string,
-  path: "subscribe" | "unsubscribe",
-  json: { collection: string },
-): ArrayBuffer;
-function rpc(id: string, path: "push" | "subscribe" | "unsubscribe", json: Batch): ArrayBuffer {
-  if (path === "subscribe" || path === "unsubscribe") {
-    return encodeClientRpcRequest({
-      id,
-      method: path,
-      params: {
-        input: {
-          json,
-        },
-      },
-    } satisfies ClientRpcRequest);
-  }
-
-  return encodeClientRpcRequest({
-    id,
-    method: "mutation",
-    params: {
-      path,
-      input: {
-        json,
-      },
-    },
-  } satisfies ClientRpcRequest);
-}
-
-function mixedBatch(): Batch {
-  return {
-    updates: [
-      {
-        id: "1",
-        collection: "/projects/p1/issues/",
-        key: "i1",
-        type: "insert",
-        value: { id: "i1" },
-        createdAt: 1,
-      },
-      {
-        id: "2",
-        collection: "/projects/p2/issues/",
-        key: "i2",
-        type: "insert",
-        value: { id: "i2" },
-        createdAt: 1,
-      },
-      {
-        id: "3",
-        collection: "/projects/",
-        key: "p1",
-        type: "insert",
-        value: { id: "p1" },
-        createdAt: 1,
-      },
-    ],
-  };
-}
-
-function ownershipTransfer(): Batch {
-  return {
-    updates: [
-      {
-        id: "owner-change",
-        collection: "/todos/",
-        key: "t1",
-        type: "update",
-        value: { id: "t1", ownerId: "u2" },
-        previousValue: { id: "t1", ownerId: "u1" },
-        clientId: "pusher",
-        createdAt: 1,
-      },
-    ],
-  };
-}
-
-function subscriptionUpdates(socket: FakeSocket): Batch["updates"] {
-  return subscriptionMessages(socket).flatMap((message) => message.params.input.json.updates);
-}
-
-function subscriptionKeys(socket: FakeSocket): Array<string | number> {
-  return subscriptionUpdates(socket).map((update: Batch["updates"][number]) => update.key);
-}
-
-function subscriptionMessages(socket: FakeSocket): Array<SubscriptionTestMessage> {
-  return socket.messages
-    .map(parseMessage)
-    .filter(
-      (message): message is SubscriptionTestMessage =>
-        "method" in message && message.method === "subscription",
-    );
-}
-
-function parseMessage(message: ArrayBuffer): TestMessage {
-  return parseServerMessage(message);
-}
