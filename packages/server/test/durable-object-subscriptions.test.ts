@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq } from "../src";
 import { CollectionShardDurableObject, type CollectionShardOptions } from "../src/durable-object";
 import type { Batch, WebSocketAttachment } from "../src/types";
+import { FakeSql } from "./storage-test-utils";
 
 interface TestMessage {
   id?: string;
@@ -81,17 +82,17 @@ describe("CollectionShardDurableObject subscriptions", () => {
     await object.webSocketMessage(pusher as never, rpc("1", "push", ownershipTransfer()));
 
     expect(subscriptionUpdates(previousOwner)).toEqual([
-      {
+      expect.objectContaining({
         id: "owner-change",
         collection: "/todos/",
         key: "t1",
         type: "delete",
         clientId: "pusher",
         createdAt: 1,
-      },
+      }),
     ]);
     expect(subscriptionUpdates(nextOwner)).toEqual([
-      {
+      expect.objectContaining({
         id: "owner-change",
         collection: "/todos/",
         key: "t1",
@@ -100,7 +101,7 @@ describe("CollectionShardDurableObject subscriptions", () => {
         previousValue: { id: "t1", ownerId: "u1" },
         clientId: "pusher",
         createdAt: 1,
-      },
+      }),
     ]);
   });
 
@@ -136,7 +137,7 @@ function setup(
       toString: () => "shard-1",
     },
     storage: {
-      sql: {},
+      sql: new FakeSql(),
     },
     getWebSockets: () => sockets as never,
   };

@@ -36,5 +36,8 @@ export type {
   ReadFilterOperator,
   ReadQuery,
   ReadResult,
+  SequencedUpdate,
+  SyncChangesQuery,
+  SyncChangesResult,
   Update,
 } from "./types";

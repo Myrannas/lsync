@@ -34,6 +34,20 @@ export class FakeSql implements SqlStorageLike {
     string,
     { path: string; value: string; version: number; createdAt: string; updatedAt: string }
   >();
+  changes: Array<{
+    sequence: number;
+    update_id: string;
+    collection: string;
+    scope: string;
+    key: string;
+    type: string;
+    value: string | null;
+    previous_value: string | null;
+    client_id: string | null;
+    client_created_at: number;
+    server_created_at: string;
+  }> = [];
+  collectionWatermarks = new Map<string, { collection: string; latest_sequence: number }>();
 
   exec<T extends Record<string, SqlStorageValue>>(
     query: string,
@@ -41,6 +55,100 @@ export class FakeSql implements SqlStorageLike {
   ): SqlStorageCursorLike<T> {
     this.statements.push({ query, bindings });
     const normalized = query.replace(/\s+/g, " ").trim();
+
+    if (
+      ["BEGIN TRANSACTION", "COMMIT", "ROLLBACK"].includes(normalized) ||
+      normalized.startsWith("CREATE TABLE IF NOT EXISTS") ||
+      normalized.startsWith("CREATE INDEX IF NOT EXISTS")
+    ) {
+      return new FakeCursor<T>();
+    }
+
+    if (
+      normalized.startsWith('SELECT COALESCE(MAX(sequence), 0) as watermark FROM "_lsync_changes"')
+    ) {
+      const watermark = this.changes.at(-1)?.sequence ?? 0;
+      return new FakeCursor([{ watermark }] as unknown as Array<T>);
+    }
+
+    if (normalized.startsWith('SELECT MIN(sequence) as sequence FROM "_lsync_changes"')) {
+      const sequence =
+        this.changes
+          .filter((change) => change.scope === bindings[0])
+          .map((change) => change.sequence)
+          .sort((left, right) => left - right)[0] ?? null;
+      return new FakeCursor([{ sequence }] as unknown as Array<T>);
+    }
+
+    if (
+      normalized.startsWith(
+        'SELECT latest_sequence FROM "_lsync_collection_watermarks" WHERE scope = ?',
+      )
+    ) {
+      const row = this.collectionWatermarks.get(String(bindings[0]));
+      return new FakeCursor(row ? ([row] as unknown as Array<T>) : []);
+    }
+
+    if (normalized.startsWith('INSERT INTO "_lsync_collection_watermarks"')) {
+      const [scope, collection, latest_sequence] = bindings;
+      this.collectionWatermarks.set(String(scope), {
+        collection: String(collection),
+        latest_sequence: Number(latest_sequence),
+      });
+      return new FakeCursor<T>();
+    }
+
+    if (normalized.startsWith('INSERT INTO "_lsync_changes"')) {
+      const [
+        update_id,
+        collection,
+        scope,
+        key,
+        type,
+        value,
+        previous_value,
+        client_id,
+        client_created_at,
+        server_created_at,
+      ] = bindings;
+      const sequence = (this.changes.at(-1)?.sequence ?? 0) + 1;
+      this.changes.push({
+        sequence,
+        update_id: String(update_id),
+        collection: String(collection),
+        scope: String(scope),
+        key: String(key),
+        type: String(type),
+        value: nullableString(value),
+        previous_value: nullableString(previous_value),
+        client_id: nullableString(client_id),
+        client_created_at: Number(client_created_at),
+        server_created_at: String(server_created_at),
+      });
+      return new FakeCursor([{ sequence }] as unknown as Array<T>);
+    }
+
+    if (normalized.startsWith('DELETE FROM "_lsync_changes" WHERE sequence <= ?')) {
+      const maxDeleted = Number(bindings[0]);
+      this.changes = this.changes.filter((change) => change.sequence > maxDeleted);
+      return new FakeCursor<T>();
+    }
+
+    if (normalized.startsWith('SELECT sequence, update_id, collection, "key"')) {
+      const limit = Number(bindings.at(-1));
+      const requested = new Map<string, number>();
+      for (let index = 0; index < bindings.length - 1; index += 2) {
+        requested.set(String(bindings[index]), Number(bindings[index + 1]));
+      }
+      const rows = this.changes
+        .filter((change) => {
+          const sequence = requested.get(change.scope);
+          return sequence !== undefined && change.sequence > sequence;
+        })
+        .sort((left, right) => left.sequence - right.sequence)
+        .slice(0, limit);
+      return new FakeCursor(rows as unknown as Array<T>);
+    }
 
     if (normalized.startsWith('SELECT value FROM "todos" WHERE path = ? AND key = ?')) {
       const row = this.rows.get(rowKey(bindings[0], bindings[1]));
@@ -122,6 +230,22 @@ function sqliteJsonValue(value: unknown): unknown {
   }
 
   return value;
+}
+
+function nullableString(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  throw new Error(`Unsupported nullable string value: ${typeof value}`);
 }
 
 function rowKey(path: unknown, key: unknown): string {

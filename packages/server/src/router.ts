@@ -5,6 +5,7 @@ import {
   collectionSubscriptionResultSchema,
   collectionSubscriptionSchema,
   readQuerySchema,
+  syncChangesQuerySchema,
   type ApiCall,
   type Batch,
   type CollectionSubscription,
@@ -12,16 +13,20 @@ import {
   type PushResult,
   type ReadQuery,
   type ReadResult,
+  type SequencedBatch,
+  type SyncChangesQuery,
+  type SyncChangesResult,
 } from "./types";
 
 export interface Context {
   shardId: string;
   validate: (batch: Batch) => void;
-  persist: (batch: Batch) => void;
-  publish: (batch: Batch) => void;
+  persist: (batch: Batch) => SequencedBatch;
+  publish: (batch: SequencedBatch) => void;
   subscribe: (input: CollectionSubscription) => CollectionSubscriptionResult;
   unsubscribe: (input: CollectionSubscription) => CollectionSubscriptionResult;
   read: (query: ReadQuery) => ReadResult;
+  changes: (query: SyncChangesQuery) => SyncChangesResult;
   callApi: (call: ApiCall) => unknown;
 }
 
@@ -30,9 +35,9 @@ const t = initTRPC.context<Context>().create();
 export const router = t.router({
   push: t.procedure.input(batchSchema).mutation(({ ctx, input }): PushResult => {
     ctx.validate(input);
-    ctx.persist(input);
-    ctx.publish(input);
-    return { accepted: input.updates.length };
+    const persisted = ctx.persist(input);
+    ctx.publish(persisted);
+    return { accepted: input.updates.length, watermark: persisted.watermark };
   }),
   read: t.procedure.input(readQuerySchema).query(({ ctx, input }): ReadResult => {
     return ctx.read(normalizeReadQuery(input));
@@ -49,6 +54,9 @@ export const router = t.router({
     .mutation(({ ctx, input }) => {
       return ctx.unsubscribe(input);
     }),
+  changes: t.procedure.input(syncChangesQuerySchema).query(({ ctx, input }): SyncChangesResult => {
+    return ctx.changes(input);
+  }),
   api: t.procedure.input(apiCallSchema).mutation(({ ctx, input }): unknown => {
     return ctx.callApi(input);
   }),

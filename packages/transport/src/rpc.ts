@@ -5,6 +5,7 @@ import {
   broadcastSchema,
   collectionSubscriptionSchema,
   readQuerySchema,
+  syncChangesQuerySchema,
 } from "./api";
 
 export const rpcIdSchema = z.union([z.string(), z.number()]).nullable().optional();
@@ -24,13 +25,24 @@ const clientRpcMutationRequestSchema = z.object({
   }),
 });
 
-const clientRpcQueryRequestSchema = z.object({
+const clientRpcReadQueryRequestSchema = z.object({
   id: rpcIdSchema,
   method: z.literal("query"),
   params: z.object({
     path: z.literal("read"),
     input: z.object({
       json: readQuerySchema,
+    }),
+  }),
+});
+
+const clientRpcChangesQueryRequestSchema = z.object({
+  id: rpcIdSchema,
+  method: z.literal("query"),
+  params: z.object({
+    path: z.literal("changes"),
+    input: z.object({
+      json: syncChangesQuerySchema,
     }),
   }),
 });
@@ -58,7 +70,8 @@ const clientRpcSubscriptionRequestSchema = z.object({
 
 export const clientRpcRequestSchema = z.union([
   clientRpcMutationRequestSchema,
-  clientRpcQueryRequestSchema,
+  clientRpcReadQueryRequestSchema,
+  clientRpcChangesQueryRequestSchema,
   clientRpcApiCallRequestSchema,
   clientRpcSubscriptionRequestSchema,
 ]);
