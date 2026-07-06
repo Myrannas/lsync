@@ -15,6 +15,8 @@ export interface FuncExpression {
 
 export interface RefExpression {
   type: "ref";
+  source?: "row" | "reference";
+  name?: string;
   path: Array<string | number>;
 }
 
@@ -32,12 +34,27 @@ export type ReadExpressionRow<T extends object = Record<string, unknown>> = {
 export function readExpressionRow<
   T extends object = Record<string, unknown>,
 >(): ReadExpressionRow<T> {
-  return refProxy([]) as ReadExpressionRow<T>;
+  return refProxy([], "row") as ReadExpressionRow<T>;
+}
+
+export function readExpressionReferences<
+  TReferences extends Record<string, object> = Record<string, Record<string, unknown>>,
+>(
+  names: Array<keyof TReferences & string>,
+): {
+  readonly [K in keyof TReferences]: ReadExpressionRow<TReferences[K]>;
+} {
+  return Object.fromEntries(
+    names.map((name) => [name, refProxy([], "reference", name)]),
+  ) as unknown as {
+    readonly [K in keyof TReferences]: ReadExpressionRow<TReferences[K]>;
+  };
 }
 
 export function field(path: string | Array<string | number>): RefExpression {
   return {
     type: "ref",
+    source: "row",
     path: Array.isArray(path) ? path : path.split("."),
   };
 }
@@ -70,7 +87,7 @@ export function lte(left: unknown, right: unknown): FuncExpression {
   return func("lte", left, right);
 }
 
-export function inArray(left: unknown, values: Array<unknown>): FuncExpression {
+export function inArray(left: unknown, values: unknown): FuncExpression {
   return func("in", left, values);
 }
 
@@ -139,10 +156,18 @@ function comparisonFromExpression(
   }
 
   return {
-    field: leftExpression.path.join("."),
+    field: rowField(leftExpression),
     op,
     value: rightExpression.value,
   };
+}
+
+function rowField(expression: RefExpression): string {
+  if (expression.source && expression.source !== "row") {
+    throw new Error("Read access expressions must reduce reference refs before compilation");
+  }
+
+  return expression.path.join(".");
 }
 
 function toReadFilterOperator(operator: string): ReadFilterOperator | undefined {
@@ -195,8 +220,12 @@ function negateOperator(operator: ReadFilterOperator): ReadFilterOperator {
   }
 }
 
-function refProxy(path: Array<string | number>): ReadExpressionField {
-  return new Proxy({ type: "ref", path } as RefExpression, {
+function refProxy(
+  path: Array<string | number>,
+  source: RefExpression["source"],
+  name?: string,
+): ReadExpressionField {
+  return new Proxy({ type: "ref", source, ...(name ? { name } : {}), path } as RefExpression, {
     get(target, property) {
       if (property in target) {
         return target[property as keyof RefExpression];
@@ -206,7 +235,7 @@ function refProxy(path: Array<string | number>): ReadExpressionField {
         return undefined;
       }
 
-      return refProxy([...path, property]);
+      return refProxy([...path, property], source, name);
     },
   }) as ReadExpressionField;
 }

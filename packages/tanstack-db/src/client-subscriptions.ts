@@ -57,6 +57,7 @@ export class ClientSubscriptions {
 
   dispatch(broadcast: Broadcast): void {
     const updatesByCollection = new Map<string, Broadcast["updates"]>();
+    const invalidationsByCollection = new Map<string, NonNullable<Broadcast["invalidations"]>>();
 
     for (const update of broadcast.updates) {
       const collection = collectionScope(update.collection);
@@ -65,15 +66,24 @@ export class ClientSubscriptions {
       updatesByCollection.set(collection, updates);
     }
 
+    for (const invalidation of broadcast.invalidations ?? []) {
+      const collection = collectionScope(invalidation.collection);
+      const invalidations = invalidationsByCollection.get(collection) ?? [];
+      invalidations.push(invalidation);
+      invalidationsByCollection.set(collection, invalidations);
+    }
+
     for (const entry of this.subscriptions.values()) {
       const updates = updatesByCollection.get(collectionScope(entry.collection));
-      if (!updates || updates.length === 0) {
+      const invalidations = invalidationsByCollection.get(collectionScope(entry.collection));
+      if ((!updates || updates.length === 0) && (!invalidations || invalidations.length === 0)) {
         continue;
       }
 
       const scopedBroadcast: Broadcast = {
         ...broadcast,
-        updates,
+        ...(invalidations ? { invalidations } : {}),
+        updates: updates ?? [],
       };
       for (const listener of entry.listeners) {
         listener(scopedBroadcast);

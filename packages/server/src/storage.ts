@@ -8,7 +8,7 @@ import { collectionScope, resolveCollection } from "./collections";
 import sqlTag, { join, type Sql } from "sql-template-tag";
 import { execSql, identifierSql, rawSql } from "./sqlite-sql";
 
-export { readSQLiteJsonRows } from "./sqlite-json-read";
+export { readSQLiteJsonRow, readSQLiteJsonRows } from "./sqlite-json-read";
 
 export type SqlStorageValue = ArrayBuffer | string | number | null;
 

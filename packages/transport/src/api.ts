@@ -126,11 +126,16 @@ export const collectionSubscriptionResultSchema = z.object({
   subscriptions: z.array(z.string()),
 });
 
+export const collectionInvalidationSchema = z.object({
+  collection: z.string(),
+});
+
 export const broadcastSchema = z.object({
   type: z.literal("updates"),
   shardId: z.string(),
   updates: z.array(sequencedUpdateSchema),
   watermark: z.number().int().nonnegative(),
+  invalidations: z.array(collectionInvalidationSchema).optional(),
 });
 
 export const webSocketAttachmentSchema = z.object({
@@ -156,6 +161,7 @@ export type ApiCallInput = z.input<typeof apiCallSchema>;
 export type CollectionSubscription = z.output<typeof collectionSubscriptionSchema>;
 export type CollectionSubscriptionInput = z.input<typeof collectionSubscriptionSchema>;
 export type CollectionSubscriptionResult = z.output<typeof collectionSubscriptionResultSchema>;
+export type CollectionInvalidation = z.output<typeof collectionInvalidationSchema>;
 
 export interface ApiRoute<TInput = unknown, TOutput = unknown> {
   input: TInput;

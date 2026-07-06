@@ -13,6 +13,7 @@ export {
   ne,
   not,
   or,
+  readExpressionReferences,
   readExpressionRow,
   val,
   type FuncExpression,
@@ -30,7 +31,13 @@ export {
   resolveCollection,
   type ResolvedCollection,
 } from "./collections";
-export { authorizeReadQuery, visibleUpdateForAuth, type ReadAccessDecision } from "./access";
+export {
+  authorizeReadQuery,
+  readAccessDecision,
+  visibleUpdateForAuth,
+  type AccessStore,
+  type ReadAccessDecision,
+} from "./access";
 export {
   persistSQLiteJsonBatchWithHistory,
   readSQLiteJsonChanges,
@@ -41,6 +48,7 @@ export { router, type Context, type Router } from "./router";
 export {
   applySQLiteJsonBatch,
   ensureSQLiteJsonTables,
+  readSQLiteJsonRow,
   readSQLiteJsonRows,
   sqliteJsonTable,
   type SQLiteJsonTableOptions,
@@ -66,6 +74,7 @@ export type {
   Batch,
   Broadcast,
   CollectionAccessConfig,
+  CollectionInvalidation,
   CollectionSubscription,
   CollectionSubscriptionInput,
   CollectionSubscriptionResult,
@@ -73,6 +82,8 @@ export type {
   CollectionConfigs,
   CollectionStorageConfig,
   OperationType,
+  AccessReference,
+  AccessReferenceResolver,
   PushResult,
   ReadAccessContext,
   ReadAccessHandler,

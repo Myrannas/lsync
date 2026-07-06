@@ -75,6 +75,39 @@ export function readSQLiteJsonRows(
   };
 }
 
+export function readSQLiteJsonRow(
+  sql: SqlStorageLike,
+  collection: string,
+  key: string | number,
+  collections: CollectionConfigs = {},
+): Record<string, unknown> | undefined {
+  ensureSQLiteJsonTables(sql, collections);
+
+  const resolved = resolveCollection(collection, collections);
+  if (!resolved) {
+    if (Object.keys(collections).length > 0) {
+      throw new Error(`Unknown collection: ${collection}`);
+    }
+
+    throw new Error(`Cannot read unconfigured collection: ${collection}`);
+  }
+
+  if (resolved.collection.storage?.kind !== "sqlite-json") {
+    throw new Error(`Collection is not readable with SQLite JSON storage: ${collection}`);
+  }
+
+  const table = tableName(resolved.name, resolved.collection.storage);
+  const row = execSql<{ value: string }>(
+    sql,
+    sqlTag`
+      SELECT value FROM ${identifierSql(table)}
+      WHERE path = ${resolved.scope} AND key = ${String(key)}
+    `,
+  ).toArray()[0];
+
+  return row ? (JSON.parse(row.value) as Record<string, unknown>) : undefined;
+}
+
 interface SelectRowsOptions {
   filters: Array<ReadFilter>;
   limit?: number;

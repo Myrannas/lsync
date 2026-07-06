@@ -1,9 +1,17 @@
 import { parseClientRpcRequest, readRpcId, sendServerMessage } from "lsync-transport";
-import { authorizeReadQuery, visibleUpdateForAuth } from "./access";
+import { authorizeReadQuery, visibleUpdateForAuth, type AccessStore } from "./access";
 import { normalizeCollection } from "./collection-normalize";
 import { callRouter } from "./durable-object-rpc";
+import {
+  persistSQLiteJsonBatchWithHistory,
+  readSQLiteJsonChanges,
+  type HistoryOptions,
+} from "./history";
 import { sendRpcError, sendRpcResult } from "./messages";
 import { router } from "./router";
+import { updateSocketSubscriptions, webSocketAttachment, webSocketAuth } from "./socket-attachment";
+import { readSQLiteJsonRow, readSQLiteJsonRows } from "./storage";
+import { subscribedInvalidations } from "./subscription-invalidation";
 import {
   type AccessAuth,
   type ApiCall,
@@ -21,15 +29,8 @@ import {
   type SequencedBatch,
   type SyncChangesQuery,
   type SyncChangesResult,
-  webSocketAttachmentSchema,
   type WebSocketAttachment,
 } from "./types";
-import { readSQLiteJsonRows } from "./storage";
-import {
-  persistSQLiteJsonBatchWithHistory,
-  readSQLiteJsonChanges,
-  type HistoryOptions,
-} from "./history";
 import { validateBatch } from "./validation";
 
 export interface Env {
@@ -73,10 +74,7 @@ export class CollectionShardDurableObject<
       subscriptions: [],
     } satisfies WebSocketAttachment);
 
-    return new Response(null, {
-      status: 101,
-      webSocket: client,
-    });
+    return new Response(null, { status: 101, webSocket: client });
   }
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
@@ -90,8 +88,8 @@ export class CollectionShardDurableObject<
         publish: (input) => this.publish(input),
         subscribe: (input) => this.subscribe(ws, input),
         unsubscribe: (input) => this.unsubscribe(ws, input),
-        read: (input) => this.read(input, this.auth(ws)),
-        changes: (input) => this.readChanges(input, this.auth(ws)),
+        read: (input) => this.read(input, webSocketAuth(ws)),
+        changes: (input) => this.readChanges(input, webSocketAuth(ws)),
         callApi: (input) => this.callApi(ws, input),
       });
 
@@ -110,29 +108,19 @@ export class CollectionShardDurableObject<
       watermark: batch.watermark,
     };
 
-    const message = {
-      method: "subscription",
-      params: {
-        path: "updates",
-        input: {
-          json: payload,
-        },
-      },
-    } as const;
-
     for (const socket of this.state.getWebSockets()) {
       const updates = this.subscribedUpdates(socket, batch);
-      if (updates.length === 0) {
-        continue;
-      }
+      const invalidations = this.subscribedInvalidations(socket, batch);
+      if (updates.length === 0 && invalidations.length === 0) continue;
 
       sendServerMessage(socket, {
-        ...message,
+        method: "subscription",
         params: {
-          ...message.params,
+          path: "updates",
           input: {
             json: {
               ...payload,
+              ...(invalidations.length > 0 ? { invalidations } : {}),
               updates,
             },
           },
@@ -157,24 +145,30 @@ export class CollectionShardDurableObject<
   }
 
   protected read(query: ReadQuery, auth: AccessAuth = {}): ReadResult {
-    const authorized = authorizeReadQuery(query, this.options.collections, auth);
-    if (!authorized) {
-      return { rows: [] };
-    }
-
-    return readSQLiteJsonRows(this.state.storage.sql, authorized, this.options.collections);
+    const authorized = authorizeReadQuery(
+      query,
+      this.options.collections,
+      auth,
+      this.accessStore(),
+    );
+    return authorized
+      ? readSQLiteJsonRows(this.state.storage.sql, authorized, this.options.collections)
+      : { rows: [] };
   }
 
   protected readChanges(query: SyncChangesQuery, auth: AccessAuth = {}): SyncChangesResult {
     const result = readSQLiteJsonChanges(this.state.storage.sql, query, this.options.collections);
-    if (result.type === "resyncRequired") {
-      return result;
-    }
+    if (result.type === "resyncRequired") return result;
 
     return {
       ...result,
       updates: result.updates.flatMap((update) => {
-        const visible = visibleUpdateForAuth(update, this.options.collections, auth);
+        const visible = visibleUpdateForAuth(
+          update,
+          this.options.collections,
+          auth,
+          this.accessStore(),
+        );
         return visible
           ? [{ ...visible, sequence: update.sequence, serverCreatedAt: update.serverCreatedAt }]
           : [];
@@ -196,13 +190,10 @@ export class CollectionShardDurableObject<
 
   private async callApi(ws: WebSocket, call: ApiCall): Promise<unknown> {
     const handler = this.options.api?.[call.path];
-
-    if (!handler) {
-      throw new Error(`Unknown API path: ${call.path}`);
-    }
+    if (!handler) throw new Error(`Unknown API path: ${call.path}`);
 
     const clientId = this.clientId(ws);
-    const auth = this.auth(ws);
+    const auth = webSocketAuth(ws);
     const args: ApiHandlerArgs = {
       shardId: this.shardId(),
       input: call.input,
@@ -217,10 +208,7 @@ export class CollectionShardDurableObject<
       changes: (input) => this.readChanges(input, auth),
     };
 
-    if (clientId) {
-      args.clientId = clientId;
-    }
-
+    if (clientId) args.clientId = clientId;
     return handler(args);
   }
 
@@ -232,7 +220,7 @@ export class CollectionShardDurableObject<
   }
 
   private clientId(ws: WebSocket): string | undefined {
-    return this.webSocketAttachment(ws)?.clientId;
+    return webSocketAttachment(ws)?.clientId;
   }
 
   private updateSubscriptions(
@@ -240,55 +228,55 @@ export class CollectionShardDurableObject<
     collection: string,
     update: (subscriptions: Set<string>, collection: string) => void,
   ): CollectionSubscriptionResult {
-    const attachment = this.webSocketAttachment(ws);
-
-    if (!attachment) {
-      throw new Error("Missing WebSocket attachment");
-    }
-
-    const normalized = normalizeCollection(collection, this.options.collections);
-    const subscriptions = new Set(attachment.subscriptions);
-    update(subscriptions, normalized);
-    const next = [...subscriptions];
-    ws.serializeAttachment({
-      ...attachment,
-      subscriptions: next,
-    } satisfies WebSocketAttachment);
-
-    return {
-      collection: normalized,
-      subscriptions: next,
-    };
+    return updateSocketSubscriptions(
+      ws,
+      collection,
+      (input) => normalizeCollection(input, this.options.collections),
+      update,
+    );
   }
 
   private subscribedUpdates(ws: WebSocket, batch: SequencedBatch): SequencedBatch["updates"] {
-    const attachment = this.webSocketAttachment(ws);
-    if (!attachment || attachment.subscriptions.length === 0) {
-      return [];
-    }
+    const attachment = webSocketAttachment(ws);
+    if (!attachment || attachment.subscriptions.length === 0) return [];
 
     const subscriptions = new Set(attachment.subscriptions);
-    const auth = this.auth(ws);
+    const auth = webSocketAuth(ws);
     return batch.updates.flatMap((update) => {
       if (!subscriptions.has(normalizeCollection(update.collection, this.options.collections))) {
         return [];
       }
 
-      const visible = visibleUpdateForAuth(update, this.options.collections, auth);
+      const visible = visibleUpdateForAuth(
+        update,
+        this.options.collections,
+        auth,
+        this.accessStore(),
+      );
       return visible
         ? [{ ...visible, sequence: update.sequence, serverCreatedAt: update.serverCreatedAt }]
         : [];
     });
   }
 
-  private webSocketAttachment(ws: WebSocket): WebSocketAttachment | undefined {
-    const result = webSocketAttachmentSchema.safeParse(ws.deserializeAttachment());
-    return result.success ? result.data : undefined;
+  private subscribedInvalidations(ws: WebSocket, batch: SequencedBatch) {
+    const attachment = webSocketAttachment(ws);
+    if (!attachment || attachment.subscriptions.length === 0) return [];
+
+    return subscribedInvalidations(
+      attachment.subscriptions,
+      batch,
+      this.options.collections,
+      webSocketAuth(ws),
+      this.accessStore(),
+    );
   }
 
-  private auth(ws: WebSocket): AccessAuth {
-    const attachment = this.webSocketAttachment(ws);
-    return attachment ? { clientId: attachment.clientId, ...attachment.auth } : {};
+  private accessStore(): AccessStore {
+    return {
+      read: (collection, key) =>
+        readSQLiteJsonRow(this.state.storage.sql, collection, key, this.options.collections),
+    };
   }
 
   private shardId(): string {
