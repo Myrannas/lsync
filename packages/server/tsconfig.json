@@ -7,5 +7,5 @@
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../transport" }]
+  "references": [{ "path": "../definition" }, { "path": "../transport" }]
 }

@@ -8,7 +8,7 @@ export interface WaitOptions {
 export async function waitForHttpOk(url: string, options: WaitOptions): Promise<string> {
   return waitFor(
     async () => {
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url, options.intervalMs ?? 1_000);
       if (!response.ok) {
         throw new Error(`Expected HTTP 2xx from ${url}, received ${response.status}`);
       }
@@ -26,7 +26,7 @@ export async function waitForHttpStatus(
 ): Promise<void> {
   await waitFor(
     async () => {
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url, options.intervalMs ?? 1_000);
       if (response.status !== status) {
         throw new Error(`Expected HTTP ${status} from ${url}, received ${response.status}`);
       }
@@ -66,4 +66,15 @@ export async function waitFor<T>(
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
 }

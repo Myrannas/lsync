@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { eq, sqliteJsonTable } from "../src";
+import { eq, sqliteJsonTable, val } from "../src";
 import {
   fakeSocket,
   mixedBatch,
@@ -49,7 +49,7 @@ describe("CollectionShardDurableObject subscriptions", () => {
   });
 
   it("filters subscribed updates through read access rules", async () => {
-    const pusher = fakeSocket("pusher", ["/todos/"], { userId: "u1" });
+    const pusher = fakeSocket("pusher", ["/todos/"], { userId: "u2" });
     const previousOwner = fakeSocket("previous-owner", ["/todos/"], { userId: "u1" });
     const nextOwner = fakeSocket("next-owner", ["/todos/"], { userId: "u2" });
     const { object } = setup([pusher, previousOwner, nextOwner], {
@@ -62,6 +62,7 @@ describe("CollectionShardDurableObject subscriptions", () => {
           storage: sqliteJsonTable({ tableName: "todos" }),
           access: {
             read: ({ auth, row }) => eq(row.ownerId, auth.userId),
+            write: () => val(true),
           },
         },
       },

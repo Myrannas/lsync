@@ -1,5 +1,9 @@
 import type { z } from "zod";
 import type {
+  ApiContract,
+  ApiInput,
+  ApiOutput,
+  ApiPath,
   Batch,
   CollectionSubscription,
   CollectionSubscriptionResult,
@@ -102,9 +106,23 @@ export type ReadAccessHandler<T extends object = Record<string, unknown>> = (
   context: ReadAccessContext<T>,
 ) => ReadAccessResult;
 
+export interface ApiAccessContext<TInput extends object = Record<string, unknown>> {
+  auth: AccessAuth;
+  input: ReadExpressionRow<TInput>;
+}
+
+export type ApiAccessHandler<TInput extends object = Record<string, unknown>> = (
+  context: ApiAccessContext<TInput>,
+) => ReadAccessResult;
+
 export interface CollectionAccessConfig<T extends object = Record<string, unknown>> {
   references?: Record<string, AccessReferenceResolver>;
   read?: ReadAccessHandler<T>;
+  write?: ReadAccessHandler<T>;
+  insert?: ReadAccessHandler<T>;
+  update?: ReadAccessHandler<T>;
+  delete?: ReadAccessHandler<T>;
+  api?: Record<string, ApiAccessHandler<any>>;
 }
 
 export interface CollectionConfig<T extends object = Record<string, unknown>> {
@@ -161,6 +179,10 @@ export interface CollectionApiDefinition<
 }
 
 export type CollectionApiHandlers = Record<string, CollectionApiDefinition<any, any>>;
+
+export type ApiHandlers<TApi extends ApiContract = ApiContract> = {
+  [TPath in ApiPath<TApi>]: ApiHandler<ApiOutput<TApi, TPath>, ApiInput<TApi, TPath>>;
+};
 
 export interface SequencedBatch {
   updates: Array<SequencedUpdate>;

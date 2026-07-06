@@ -6,5 +6,5 @@
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../../packages/server" }]
+  "references": [{ "path": "../example-definition" }, { "path": "../../packages/server" }]
 }

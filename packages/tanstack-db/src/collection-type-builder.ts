@@ -12,6 +12,7 @@ import type {
   CollectionTypeChildren,
 } from "./collection-type-types";
 import type { Client } from "./types";
+import { collectionTypesFrom } from "./definition-builder";
 
 type BuilderApiContext<TInput, T extends object, TKey extends string | number> = Omit<
   CollectionApiHandlerArgs<TInput, T, TKey>,
@@ -36,6 +37,7 @@ export function collectionTypeBuilder(): Pick<
 
 export const CollectionTypes = {
   builder: collectionTypeBuilder,
+  from: collectionTypesFrom,
 };
 
 export class CollectionTypeBuilder<

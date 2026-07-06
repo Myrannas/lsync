@@ -23,6 +23,7 @@ export interface Context {
   validate: (batch: Batch) => void;
   persist: (batch: Batch) => SequencedBatch;
   publish: (batch: SequencedBatch) => void;
+  mutate: (batch: Batch) => PushResult;
   subscribe: (input: CollectionSubscription) => CollectionSubscriptionResult;
   unsubscribe: (input: CollectionSubscription) => CollectionSubscriptionResult;
   read: (query: ReadQuery) => ReadResult;
@@ -34,10 +35,7 @@ const t = initTRPC.context<Context>().create();
 
 export const router = t.router({
   push: t.procedure.input(batchSchema).mutation(({ ctx, input }): PushResult => {
-    ctx.validate(input);
-    const persisted = ctx.persist(input);
-    ctx.publish(persisted);
-    return { accepted: input.updates.length, watermark: persisted.watermark };
+    return ctx.mutate(input);
   }),
   read: t.procedure.input(readQuerySchema).query(({ ctx, input }): ReadResult => {
     return ctx.read(normalizeReadQuery(input));
