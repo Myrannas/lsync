@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { ReadQuery } from "@lsync/transport";
+import type { ReadQuery } from "../src/types";
 import { applySQLiteJsonBatch, readSQLiteJsonRows } from "../src/storage";
 import { batch, collections, FakeSql } from "./storage-test-utils";
 

@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@lsync/definitions": ["../../definition/src/index.ts"],
+      "@lsync/transport": ["../../transport/src/index.ts"]
+    }
+  },
+  "include": ["../src/**/*.ts", "./**/*.ts"]
+}
