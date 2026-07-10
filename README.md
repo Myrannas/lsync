@@ -1,34 +1,37 @@
-# Lightweight Sync
+# lsync
 
-`lsync` is an experimental data sync library backed by a Cloudflare Durable Object and designed
-to integrate with TanStack DB. It synchronizes eager collections or query-driven subsets between
-connected clients while keeping schemas and document APIs in a shared definition.
+Lightweight sync for local-first collections.
+
+`lsync` is an experimental data sync library that combines a Cloudflare Durable Object sync
+server with TanStack DB client adapters. It keeps collection schemas, keys, child paths, and
+document APIs aligned through one shared definition.
+
+[Documentation](https://myrannas.github.io/lsync/) ·
+[Examples](https://myrannas.github.io/lsync/examples/simple) ·
+[API reference](https://myrannas.github.io/lsync/api/reference/) ·
+[Contributing](CONTRIBUTING.md)
+
+## Why lsync?
+
+- **Durable Object backed.** Store collection rows and sync history in Cloudflare Durable Object
+  SQLite storage.
+- **TanStack DB native.** Use live queries, optimistic local writes, eager sync, and query-driven
+  on-demand subsets.
+- **One shared contract.** Define schemas, keys, child collections, and document APIs once, then
+  derive the server and client configuration from it.
 
 ## Packages
 
-- `@lsync/definitions` defines portable collection schemas, keys, children, and API contracts.
-- `@lsync/server` hosts storage, sync, access rules, and API handlers in a Durable Object.
-- `@lsync/client` creates typed TanStack DB collection managers from the shared definition.
-- `@lsync/transport` provides the shared MessagePack wire contracts.
+| Package              | Purpose                                                                         |
+| -------------------- | ------------------------------------------------------------------------------- |
+| `@lsync/definitions` | Shared collection, child collection, key, and document API contracts.           |
+| `@lsync/server`      | Durable Object hosting, storage, indexes, access control, and API handlers.     |
+| `@lsync/client`      | TanStack DB collection types, sync modes, scoped children, and typed API calls. |
+| `@lsync/transport`   | Shared messages, read expressions, and RPC transport contracts.                 |
 
-## Local Development
+## Quick start
 
-Install dependencies with Vite+:
-
-```sh
-vp install
-```
-
-Run the example worker and React application in separate terminals:
-
-```sh
-vp run dev:worker
-vp run dev:react
-```
-
-## Shared Definition
-
-Create one contract imported by the Worker and application:
+Define a portable contract that both the Worker and application can import:
 
 ```ts
 import { defineCollections } from "@lsync/definitions";
@@ -45,9 +48,7 @@ export const appCollections = defineCollections()
   .build();
 ```
 
-## Worker
-
-Add server-only indexes, access rules, initial data, and API handlers as overrides:
+Add server-only behavior as overrides to the shared definition:
 
 ```ts
 import { appCollections } from "./definition";
@@ -66,56 +67,61 @@ export class CollectionShard extends CollectionShardDurableObject {
 export default createWorkerHandler();
 ```
 
-## TanStack DB Client
+Build typed TanStack DB collection managers from the same definition:
 
-Build typed collection managers from the same contract:
-
-```tsx
-import { eq } from "@tanstack/db";
-import { useLiveQuery } from "@tanstack/react-db";
+```ts
 import { appCollections } from "./definition";
 import { collectionTypesFrom } from "@lsync/client";
 
-const { todos } = collectionTypesFrom(appCollections)
+export const { todos } = collectionTypesFrom(appCollections)
   .url("ws://localhost:8787/sync/demo")
   .collection("todos", (todos) => todos.sync("on-demand"))
   .build();
-
-export function OpenTodos() {
-  const { data } = useLiveQuery((query) =>
-    query
-      .from({ todo: todos.all() })
-      .where(({ todo }) => eq(todo.completed, false))
-      .orderBy(({ todo }) => todo.text),
-  );
-
-  return (
-    <ul>
-      {data.map((todo) => (
-        <li key={todo.id}>{todo.text}</li>
-      ))}
-    </ul>
-  );
-}
 ```
 
-With `sync("on-demand")`, TanStack DB's active query determines the server-side subset. Use
-`sync("eager")` when a small collection should hydrate in full.
+Use `sync("on-demand")` when active TanStack DB queries should determine the server-side subset.
+Use `sync("eager")` when a small collection should hydrate in full at startup.
 
-## Documentation
+The [guide](https://myrannas.github.io/lsync/guide/) continues with live queries, nested
+collections, offline intent queues, document APIs, and access-management patterns.
 
-The documentation site covers sync modes, offline intent queues, document APIs, access management,
-and the public API reference.
+## Development
+
+Install dependencies with [Vite+](https://viteplus.dev/guide/):
+
+```sh
+vp install
+```
+
+Run the example Worker and React application in separate terminals:
+
+```sh
+vp run dev:worker
+vp run dev:react
+```
+
+Run the documentation site locally or build it for deployment:
 
 ```sh
 vp run docs:dev
 vp run docs:build
 ```
 
-The GitHub Pages workflow publishes the built site from `main`.
+Before opening a pull request, run:
 
-## Notes
+```sh
+vp run check
+vp test
+```
 
-The WebSocket transport is designed for Cloudflare Durable Object hibernation. Local mutations are
-optimistic, while the server echo remains the accepted sync event used to reconcile synced state
-and active subsets.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow.
+
+## Status
+
+`lsync` is experimental and its public API may change before a stable release. The WebSocket
+transport is designed for Cloudflare Durable Object hibernation; local mutations are optimistic,
+while server echoes reconcile accepted sync state and active subsets.
+
+## License
+
+[MIT](LICENSE)
