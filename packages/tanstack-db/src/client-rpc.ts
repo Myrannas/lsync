@@ -6,6 +6,12 @@ export interface PendingRequest {
   reject: (error: Error) => void;
 }
 
+export function rejectPending(pending: Map<string, PendingRequest>, error: Error): void {
+  const requests = [...pending.values()];
+  pending.clear();
+  for (const request of requests) request.reject(error);
+}
+
 export function takePending(
   pending: Map<string, PendingRequest>,
   id: RpcId,

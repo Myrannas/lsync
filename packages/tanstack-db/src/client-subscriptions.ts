@@ -5,7 +5,9 @@ type SubscriptionListener = (broadcast: Broadcast) => void;
 
 interface SubscriptionEntry {
   collection: string;
+  disconnectListeners: Set<() => void>;
   listeners: Set<SubscriptionListener>;
+  reconnectListeners: Set<() => void>;
   ready: Promise<void>;
 }
 
@@ -32,7 +34,9 @@ export class ClientSubscriptions {
     if (!entry) {
       entry = {
         collection: key,
+        disconnectListeners: new Set(),
         listeners: new Set(),
+        reconnectListeners: new Set(),
         ready: Promise.resolve(),
       };
       this.subscriptions.set(key, entry);
@@ -45,8 +49,26 @@ export class ClientSubscriptions {
 
     return {
       ready: entry.ready,
+      onDisconnect: (next) => addLifecycleListener(entry.disconnectListeners, next),
+      onReconnect: (next) => addLifecycleListener(entry.reconnectListeners, next),
       unsubscribe: () => this.unsubscribe(key, listener),
     };
+  }
+
+  get hasSubscriptions(): boolean {
+    return this.subscriptions.size > 0;
+  }
+
+  disconnected(): void {
+    for (const entry of this.subscriptions.values()) {
+      for (const listener of entry.disconnectListeners) listener();
+    }
+  }
+
+  reconnected(): void {
+    for (const entry of this.subscriptions.values()) {
+      for (const listener of entry.reconnectListeners) listener();
+    }
   }
 
   async replay(ws: WebSocket): Promise<void> {
@@ -121,7 +143,12 @@ export class ClientSubscriptions {
     this.subscriptions.delete(key);
     const socket = this.controls.currentSocket();
     if (socket?.readyState === WebSocket.OPEN) {
-      void this.controls.send(socket, "unsubscribe", entry.collection);
+      void this.controls.send(socket, "unsubscribe", entry.collection).catch(() => undefined);
     }
   }
+}
+
+function addLifecycleListener(listeners: Set<() => void>, listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }

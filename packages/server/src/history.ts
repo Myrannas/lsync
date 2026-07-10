@@ -12,8 +12,11 @@ import {
   recordCollectionWatermark,
 } from "./history-watermarks";
 import { applySQLiteJsonBatch, ensureSQLiteJsonTables, type SqlStorageLike } from "./storage";
+import { deduplicateMutations, recordAppliedMutations } from "./mutation-dedup";
 
 const CHANGES_TABLE = "_lsync_changes";
+
+export const SQLITE_JSON_CONFLICT_POLICY = "server-sequence-last-write-wins" as const;
 
 export interface HistoryOptions {
   maxChanges?: number;
@@ -32,10 +35,15 @@ export function persistSQLiteJsonBatchWithHistory(
 ): SequencedBatch {
   ensureSQLiteJsonTables(sql, collections);
   ensureChangesTable(sql);
+  const pending = deduplicateMutations(sql, batch);
+  if (pending.updates.length === 0) {
+    return { updates: [], watermark: readWatermark(sql) };
+  }
 
-  applySQLiteJsonBatch(sql, batch, collections);
+  applySQLiteJsonBatch(sql, pending, collections);
 
-  const updates = batch.updates.map((update) => appendChange(sql, update, collections));
+  const updates = pending.updates.map((update) => appendChange(sql, update, collections));
+  recordAppliedMutations(sql, updates);
   const watermark = updates.at(-1)?.sequence ?? readWatermark(sql);
   pruneChanges(sql, watermark, options.maxChanges ?? 10000);
 
@@ -79,12 +87,21 @@ export function readSQLiteJsonChanges(
   const limit = query.limit ?? 1000;
   const rows = selectChanges(sql, requested, limit + 1);
   const page = rows.slice(0, limit);
+  const cursors = Object.fromEntries(requested.map((item) => [item.collection, item.sequence]));
+  for (const row of page) {
+    const item = requested.find((candidate) => candidate.scope === row.scope);
+    if (item) cursors[item.collection] = row.sequence;
+  }
+  if (rows.length <= limit) {
+    for (const item of requested) cursors[item.collection] = watermark;
+  }
 
   return {
     type: "changes",
     updates: page.map(rowToUpdate),
     watermark,
     hasMore: rows.length > limit,
+    cursors,
   };
 }
 
@@ -164,7 +181,7 @@ function selectChanges(
   return sql
     .exec<ChangeRow>(
       `
-        SELECT sequence, update_id, collection, "key", type, value, previous_value, client_id,
+        SELECT sequence, update_id, collection, scope, "key", type, value, previous_value, client_id,
                client_created_at, server_created_at
         FROM ${quoteIdentifier(CHANGES_TABLE)}
         WHERE ${requested.map(() => "(scope = ? AND sequence > ?)").join(" OR ")}
@@ -265,6 +282,7 @@ interface ChangeRow extends Record<string, string | number | null> {
   sequence: number;
   update_id: string;
   collection: string;
+  scope: string;
   key: string;
   type: SequencedUpdate["type"];
   value: string | null;
