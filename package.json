@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:packages": "vp run --filter './packages/*' build",
     "docs:api": "typedoc",
     "docs:build": "vitepress build docs && typedoc",
     "docs:dev": "vitepress dev docs",
@@ -11,6 +12,8 @@
     "dev:worker": "corepack pnpm --filter @lfsync/example-worker dev",
     "dev:react": "corepack pnpm --filter @lfsync/example-react dev",
     "e2e": "vp test run --config apps/integration-tests/vite.config.ts apps/integration-tests/test/smoke.e2e.ts",
+    "publish:packages": "vp run build:packages && node scripts/publish-packages.ts",
+    "publish:packages:dry-run": "vp run build:packages && node scripts/publish-packages.ts --dry-run",
     "prepare": "vp config"
   },
   "devDependencies": {

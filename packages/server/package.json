@@ -1,23 +1,43 @@
 {
-  "name": "lsync-server",
-  "version": "0.0.0",
+  "name": "@lsync/server",
+  "version": "0.0.1",
+  "homepage": "https://github.com/Myrannas/lsync#readme",
+  "bugs": {
+    "url": "https://github.com/Myrannas/lsync/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Myrannas/lsync.git",
+    "directory": "packages/server"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
     },
     "./client": {
-      "types": "./dist/client.d.ts",
-      "import": "./dist/client.js"
+      "types": "./dist/client.d.mts",
+      "import": "./dist/client.mjs"
     }
   },
-  "scripts": {},
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "prepublishOnly": "vp pack"
+  },
   "dependencies": {
+    "@lsync/definitions": "workspace:*",
+    "@lsync/transport": "workspace:*",
     "@trpc/server": "catalog:",
-    "lsync-definition": "workspace:*",
-    "lsync-transport": "workspace:*",
     "sql-template-tag": "^5.2.1",
     "zod": "catalog:"
   },

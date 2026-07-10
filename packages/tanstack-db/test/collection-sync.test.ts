@@ -100,8 +100,8 @@ describe("collectionOptions sync", () => {
     const client: Client = {
       clientId: "client-1",
       push: async (batch) => ({ accepted: batch.updates.length, watermark: 0 }),
-      read: async () => ({
-        rows: [{ id: "1", text: "Write tests", completed: false }],
+      read: async <T>() => ({
+        rows: [{ id: "1", text: "Write tests", completed: false }] as unknown as Array<T>,
       }),
       changes: async () => ({ type: "changes", updates: [], watermark: 0, hasMore: false }),
       call: async () => undefined,
@@ -191,8 +191,8 @@ describe("collectionOptions sync", () => {
     const client: Client = {
       clientId: "client-1",
       push: async (batch) => ({ accepted: batch.updates.length, watermark: 0 }),
-      read: async () => ({
-        rows: [{ id: "1", text: "Write tests", completed: false }],
+      read: async <T>() => ({
+        rows: [{ id: "1", text: "Write tests", completed: false }] as unknown as Array<T>,
       }),
       changes: async () => ({ type: "changes", updates: [], watermark: 0, hasMore: false }),
       call: async () => undefined,

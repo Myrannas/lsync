@@ -5,7 +5,7 @@ same rows.
 
 ```ts
 import { appCollections } from "./definition";
-import { collectionTypesFrom } from "lsync-tanstack-db";
+import { collectionTypesFrom } from "@lsync/client";
 
 export const { settings } = collectionTypesFrom(appCollections)
   .url(syncUrl)

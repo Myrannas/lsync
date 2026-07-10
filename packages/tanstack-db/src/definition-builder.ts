@@ -7,7 +7,7 @@ import type {
   CollectionDefinitions,
   CollectionPath,
   CollectionSet,
-} from "lsync-definition";
+} from "@lsync/definitions";
 import { createCollectionTypeFromOptions } from "./collection-type";
 import type {
   ChildCollectionTypeOptions,

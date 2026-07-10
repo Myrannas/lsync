@@ -4,7 +4,7 @@ compatibility_date = "2026-07-04"
 
 [alias]
 "@lfsync/example-definition" = "../example-definition/src/index.ts"
-"lsync-definition" = "../../packages/definition/src/index.ts"
+"@lsync/definitions" = "../../packages/definition/src/index.ts"
 
 [[durable_objects.bindings]]
 name = "SYNC_SHARDS"

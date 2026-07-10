@@ -6,7 +6,7 @@ TanStack DB live query.
 ## Shared Definition
 
 ```ts
-import { defineCollections } from "lsync-definition";
+import { defineCollections } from "@lsync/definitions";
 import { z } from "zod";
 
 export const todoSchema = z.object({
@@ -24,7 +24,7 @@ export const appCollections = defineCollections()
 
 ```ts
 import { appCollections } from "./definition";
-import { CollectionShardDurableObject, createWorkerHandler, type Env } from "lsync-server";
+import { CollectionShardDurableObject, createWorkerHandler, type Env } from "@lsync/server";
 
 const shardOptions = CollectionShardDurableObject.from(appCollections)
   .collection("todos", (todos) => todos.index("completed"))
@@ -45,7 +45,7 @@ export default createWorkerHandler();
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { appCollections } from "./definition";
-import { collectionTypesFrom } from "lsync-tanstack-db";
+import { collectionTypesFrom } from "@lsync/client";
 import { useState } from "react";
 
 const { todos } = collectionTypesFrom(appCollections)

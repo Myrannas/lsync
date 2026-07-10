@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@lfsync/example-definition": "workspace:*",
-    "lsync-server": "workspace:*"
+    "@lsync/server": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",

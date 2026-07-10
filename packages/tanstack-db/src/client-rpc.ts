@@ -1,4 +1,4 @@
-import type { ClientRpcRequest, RpcId } from "lsync-transport";
+import type { ClientRpcRequest, RpcId } from "@lsync/transport";
 import type { ApiCall, Batch, ReadQuery, SyncChangesQuery } from "./types";
 
 export interface PendingRequest {

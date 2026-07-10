@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import type { ReadQuery } from "@lsync/transport";
 import { applySQLiteJsonBatch, readSQLiteJsonRows } from "../src/storage";
 import { batch, collections, FakeSql } from "./storage-test-utils";
 
@@ -279,7 +280,7 @@ describe("sqliteJsonTable", () => {
     const query = {
       collection: "todos",
       filters: [{ field: "completed') = true --", op: "eq", value: true }],
-    } as const;
+    } satisfies ReadQuery;
 
     expect(() => readSQLiteJsonRows(sql, query, collections)).toThrow("Invalid JSON index field");
   });

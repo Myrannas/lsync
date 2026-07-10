@@ -7,7 +7,7 @@ the server.
 ## Shared Contract
 
 ```ts
-import { defineCollections } from "lsync-definition";
+import { defineCollections } from "@lsync/definitions";
 import { z } from "zod";
 
 const documentSchema = z.object({
@@ -55,7 +55,7 @@ const shardOptions = CollectionShardDurableObject.from(appCollections)
 ## Typed Client Call
 
 ```ts
-import { collectionTypesFrom } from "lsync-tanstack-db";
+import { collectionTypesFrom } from "@lsync/client";
 
 const { documents } = collectionTypesFrom(appCollections)
   .url(syncUrl)
@@ -66,6 +66,6 @@ const result = await documents.archive({ id: "doc_123" });
 console.log(result.watermark);
 ```
 
-The input and output schemas live in `lsync-definition`, so the server handler and client call use
+The input and output schemas live in `@lsync/definitions`, so the server handler and client call use
 the same inferred types. Add `.access("api.archive", handler)` on the server override when the
 command needs a separate permission check.

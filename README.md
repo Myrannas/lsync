@@ -6,9 +6,10 @@ connected clients while keeping schemas and document APIs in a shared definition
 
 ## Packages
 
-- `lsync-definition` defines portable collection schemas, keys, children, and API contracts.
-- `lsync-server` hosts storage, sync, access rules, and API handlers in a Durable Object.
-- `lsync-tanstack-db` creates typed TanStack DB collection managers from the shared definition.
+- `@lsync/definitions` defines portable collection schemas, keys, children, and API contracts.
+- `@lsync/server` hosts storage, sync, access rules, and API handlers in a Durable Object.
+- `@lsync/client` creates typed TanStack DB collection managers from the shared definition.
+- `@lsync/transport` provides the shared MessagePack wire contracts.
 
 ## Local Development
 
@@ -30,7 +31,7 @@ vp run dev:react
 Create one contract imported by the Worker and application:
 
 ```ts
-import { defineCollections } from "lsync-definition";
+import { defineCollections } from "@lsync/definitions";
 import { z } from "zod";
 
 export const todoSchema = z.object({
@@ -50,7 +51,7 @@ Add server-only indexes, access rules, initial data, and API handlers as overrid
 
 ```ts
 import { appCollections } from "./definition";
-import { CollectionShardDurableObject, createWorkerHandler, type Env } from "lsync-server";
+import { CollectionShardDurableObject, createWorkerHandler, type Env } from "@lsync/server";
 
 const shardOptions = CollectionShardDurableObject.from(appCollections)
   .collection("todos", (todos) => todos.index("completed"))
@@ -73,7 +74,7 @@ Build typed collection managers from the same contract:
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { appCollections } from "./definition";
-import { collectionTypesFrom } from "lsync-tanstack-db";
+import { collectionTypesFrom } from "@lsync/client";
 
 const { todos } = collectionTypesFrom(appCollections)
   .url("ws://localhost:8787/sync/demo")
