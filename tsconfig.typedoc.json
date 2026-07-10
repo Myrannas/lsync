@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": [
+    "packages/definition/src/**/*.ts",
+    "packages/server/src/**/*.ts",
+    "packages/tanstack-db/src/**/*.ts"
+  ],
+  "exclude": ["**/*.test.ts", "apps/**"]
+}

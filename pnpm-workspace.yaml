@@ -16,6 +16,9 @@ catalog:
   wrangler: ^4.107.0
   vite: npm:@voidzero-dev/vite-plus-core@0.2.2
   vite-plus: 0.2.2
+  typedoc: ^0.28.20
+  vitepress: 2.0.0-alpha.18
+  vue: ^3.5.39
   "@vitejs/plugin-react": ^4.7.0
   react: ^19.1.1
   react-dom: ^19.1.1

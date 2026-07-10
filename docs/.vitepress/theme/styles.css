@@ -1,0 +1,30 @@
+:root {
+  --vp-c-brand-1: #0f766e;
+  --vp-c-brand-2: #0891b2;
+  --vp-c-brand-3: #14b8a6;
+  --vp-home-hero-name-color: #0f766e;
+  --vp-code-block-bg: #f6f8fa;
+}
+
+.dark {
+  --vp-code-block-bg: #0f172a;
+}
+
+.VPHomeHero .name,
+.VPHomeHero .text {
+  letter-spacing: 0;
+}
+
+.VPDoc h2 {
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 28px;
+}
+
+.vp-doc .custom-block.tip {
+  border-color: rgba(15, 118, 110, 0.24);
+}
+
+.vp-doc table {
+  display: table;
+  width: 100%;
+}
