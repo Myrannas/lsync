@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { collectionOptions, createBatch, createClient, toChangeMessage } from "../src/index";
+import { createBatch, toChangeMessage } from "../src/index";
 import { acquireSharedClient } from "../src/client";
+import { createClient } from "../src/client";
+import { collectionOptions } from "../src/collection";
 import { BasicIndex } from "@tanstack/db";
 import type { PendingMutation, TransactionWithMutations } from "@tanstack/db";
 import type { ApiRoute, Client } from "../src/index";

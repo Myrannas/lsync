@@ -1,7 +1,7 @@
 import { BasicIndex, eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { exampleCollections } from "@lfsync/example-definition";
-import { CollectionTypes } from "lsync-tanstack-db";
+import { collectionTypesFrom } from "lsync-tanstack-db";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Badge } from "./components/ui/badge";
@@ -24,7 +24,7 @@ const shardId = new URLSearchParams(window.location.search).get("shard") ?? "dem
 const workerUrl = import.meta.env.VITE_SYNC_URL ?? "ws://localhost:8787";
 const syncUrl = `${workerUrl.replace(/\/$/, "")}/sync/${encodeURIComponent(shardId)}`;
 
-const collections = CollectionTypes.from(exampleCollections)
+const collections = collectionTypesFrom(exampleCollections)
   .url(syncUrl)
   .collection("users", (users) => users.sync("on-demand").index("eager", BasicIndex))
   .collection("todos", (todos) => todos.sync("on-demand"))

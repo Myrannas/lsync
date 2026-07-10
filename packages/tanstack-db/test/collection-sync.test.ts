@@ -1,7 +1,7 @@
 import type { LoadSubsetOptions, PendingMutation, TransactionWithMutations } from "@tanstack/db";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { collectionOptions } from "../src";
+import { collectionOptions } from "../src/collection";
 import type { Broadcast, Client } from "../src";
 
 interface Todo {

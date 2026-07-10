@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { Collections, collectionApiHandlers, defaultCollectionApiPath } from "../src";
+import { collectionApiHandlers, defaultCollectionApiPath } from "../src";
+import { Collections } from "../src/collection-builder";
 import { readSQLiteJsonRows } from "../src/sqlite-json-read";
 import { applySQLiteJsonBatch, sqliteJsonTable } from "../src/storage";
 import { validateBatch } from "../src/validation";

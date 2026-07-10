@@ -6,8 +6,9 @@ be quickly replicated between connected users.
 
 ## Packages
 
-- `lsync-server` exports the reusable Durable Object class, worker fetch handler, tRPC router, and shared wire types.
-- `lsync-tanstack-db` exports `collectionOptions`, a TanStack DB collection adapter.
+- `lsync-definition` defines the shared collection contract.
+- `lsync-server` creates Durable Object options from that shared contract.
+- `lsync-tanstack-db` creates TanStack DB collections from the same shared contract.
 
 ## Local Development
 
@@ -20,13 +21,8 @@ vp install
 ## Example Worker
 
 ```ts
-import {
-  CollectionShardDurableObject,
-  Collections,
-  createWorkerHandler,
-  sqliteJsonTable,
-  type Env,
-} from "lsync-server";
+import { CollectionShardDurableObject, createWorkerHandler, type Env } from "lsync-server";
+import { defineCollections } from "lsync-definition";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -46,31 +42,31 @@ const issueSchema = z.object({
   status: z.enum(["open", "closed"]),
 });
 
+const definitions = defineCollections()
+  .collection("todos", (todos) =>
+    todos
+      .schema(todoSchema)
+      .key("id")
+      .api("health", (api) => api.input(z.undefined()).output(z.object({ ok: z.boolean() }))),
+  )
+  .collection("projects", (projects) =>
+    projects
+      .schema(projectSchema)
+      .key("id")
+      .children((children) =>
+        children.collection("issues", (issues) => issues.schema(issueSchema).key("id")),
+      ),
+  )
+  .build();
+
+const shardOptions = CollectionShardDurableObject.from(definitions)
+  .collection("todos", (todos) => todos.index("completed").api("health", () => ({ ok: true })))
+  .collection("projects.issues", (issues) => issues.index("status"))
+  .build();
+
 export class CollectionShard extends CollectionShardDurableObject {
   constructor(state: DurableObjectState, env: Env) {
-    const collections = Collections.builder()
-      .collection("todos", (collection) =>
-        collection
-          .schema(todoSchema)
-          .index("completed")
-          .api("health", z.undefined(), () => ({ ok: true })),
-      )
-      .collection("projects", (collection) =>
-        collection
-          .schema(projectSchema)
-          .storage(sqliteJsonTable({ tableName: "projects" }))
-          .child("issues", (child) =>
-            child
-              .schema(issueSchema)
-              .storage(sqliteJsonTable({ tableName: "issues" }))
-              .index("status"),
-          ),
-      )
-      .build();
-
-    super(state, env, {
-      collections,
-    });
+    super(state, env, shardOptions);
   }
 }
 
@@ -82,7 +78,8 @@ export default createWorkerHandler();
 ```tsx
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
-import { createCollectionType } from "lsync-tanstack-db";
+import { defineCollections } from "lsync-definition";
+import { collectionTypesFrom } from "lsync-tanstack-db";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -94,13 +91,14 @@ const todoSchema = z.object({
 
 type Todo = z.infer<typeof todoSchema>;
 
-const todoType = createCollectionType({
-  path: "/todos/",
-  url: "ws://localhost:8787/sync/demo",
-  getKey: (todo: Todo) => todo.id,
-  schema: todoSchema,
-  syncMode: "on-demand",
-});
+const definitions = defineCollections()
+  .collection("todos", (todos) => todos.schema(todoSchema).key("id"))
+  .build();
+
+const todoType = collectionTypesFrom(definitions)
+  .url("ws://localhost:8787/sync/demo")
+  .collection("todos", (todos) => todos.sync("on-demand"))
+  .build().todos;
 
 const todos = todoType.all();
 
@@ -176,20 +174,21 @@ scope, so issue `i1` can exist independently in different projects.
 For related collections, use a collection type to resolve and cache concrete scoped collections:
 
 ```ts
-const projects = createCollectionType({
-  path: "/projects/",
-  url: "ws://localhost:8787/sync/demo",
-  getKey: (project: Project) => project.id,
-  schema: projectSchema,
-  children: {
-    issues: {
-      path: "/projects/{projectId}/issues/",
-      getKey: (issue: Issue) => issue.id,
-      schema: issueSchema,
-      syncMode: "on-demand",
-    },
-  },
-});
+const definitions = defineCollections()
+  .collection("projects", (projects) =>
+    projects
+      .schema(projectSchema)
+      .key("id")
+      .children((children) =>
+        children.collection("issues", (issues) => issues.schema(issueSchema).key("id")),
+      ),
+  )
+  .build();
+
+const projects = collectionTypesFrom(definitions)
+  .url("ws://localhost:8787/sync/demo")
+  .collection("projects.issues", (issues) => issues.sync("on-demand"))
+  .build().projects;
 
 const allProjects = projects.all();
 const project = projects.withId("p1").get();
