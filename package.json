@@ -14,11 +14,13 @@
     "e2e": "vp test run --config apps/integration-tests/vite.config.ts apps/integration-tests/test/smoke.e2e.ts",
     "publish:packages": "vp run build:packages && node scripts/publish-packages.ts",
     "publish:packages:dry-run": "vp run build:packages && node scripts/publish-packages.ts --dry-run",
-    "prepare": "vp config"
+    "prepare": "vp config",
+    "version:packages": "node scripts/version-packages.ts"
   },
   "devDependencies": {
     "@ast-grep/cli": "^0.44.1",
     "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
     "typedoc": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
