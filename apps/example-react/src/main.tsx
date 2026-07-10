@@ -1,7 +1,7 @@
 import { BasicIndex, eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { exampleCollections } from "@lfsync/example-definition";
-import { collectionTypesFrom } from "lsync-tanstack-db";
+import { collectionTypesFrom } from "@lsync/client";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Badge } from "./components/ui/badge";

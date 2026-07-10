@@ -13,8 +13,8 @@ import type {
   SequencedUpdate,
   SyncChangesQuery,
   SyncChangesResult,
-} from "lsync-transport";
-import type { ReadExpressionInput, ReadExpressionRow } from "lsync-transport";
+} from "@lsync/transport";
+import type { ReadExpressionInput, ReadExpressionRow } from "@lsync/transport";
 
 export {
   apiCallSchema,
@@ -36,7 +36,7 @@ export {
   syncChangesResultSchema,
   updateSchema,
   webSocketAttachmentSchema,
-} from "lsync-transport";
+} from "@lsync/transport";
 export type {
   ApiCall,
   ApiCallArgs,
@@ -71,7 +71,7 @@ export type {
   SyncChangesResult,
   Update,
   WebSocketAttachment,
-} from "lsync-transport";
+} from "@lsync/transport";
 
 export type AccessAuth = Record<string, unknown> & {
   clientId?: string;

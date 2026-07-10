@@ -7,7 +7,7 @@ import {
   type ReadExpressionRow,
   type RefExpression,
   type ValExpression,
-} from "lsync-transport";
+} from "@lsync/transport";
 import type { ReadPredicate } from "./types";
 
 export interface ReferenceDependency {

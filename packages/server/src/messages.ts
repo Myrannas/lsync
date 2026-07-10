@@ -1,4 +1,4 @@
-import { sendServerMessage, type RpcId } from "lsync-transport";
+import { sendServerMessage, type RpcId } from "@lsync/transport";
 
 export function sendRpcResult(ws: WebSocket, id: RpcId, result: unknown): void {
   sendServerMessage(ws, {

@@ -14,7 +14,7 @@ The usual pattern is:
 
 ```ts
 import { appCollections } from "./definition";
-import { collectionTypesFrom } from "lsync-tanstack-db";
+import { collectionTypesFrom } from "@lsync/client";
 
 const clientId =
   localStorage.getItem("lsync-client-id") ??

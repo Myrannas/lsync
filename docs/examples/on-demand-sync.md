@@ -6,7 +6,7 @@ loads each server-side subset and releases it when the query unmounts.
 ```ts
 import { BasicIndex, eq } from "@tanstack/db";
 import { appCollections } from "./definition";
-import { collectionTypesFrom } from "lsync-tanstack-db";
+import { collectionTypesFrom } from "@lsync/client";
 
 const { todos, users } = collectionTypesFrom(appCollections)
   .url(syncUrl)

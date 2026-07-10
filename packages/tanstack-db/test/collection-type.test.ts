@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
-import { defineCollections } from "../../definition/src";
+import { defineCollections } from "@lsync/definitions";
 import type { Client } from "../src";
 import { CollectionTypes } from "../src/collection-type-builder";
 

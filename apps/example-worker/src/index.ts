@@ -1,5 +1,5 @@
 import { exampleCollections } from "@lfsync/example-definition";
-import { CollectionShardDurableObject, createWorkerHandler, type Env } from "lsync-server";
+import { CollectionShardDurableObject, createWorkerHandler, type Env } from "@lsync/server";
 
 const shardOptions = CollectionShardDurableObject.from(exampleCollections)
   .collection("todos", (todos) =>

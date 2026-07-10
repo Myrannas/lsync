@@ -11,7 +11,7 @@
   },
   "scripts": {},
   "dependencies": {
-    "lsync-definition": "workspace:*",
+    "@lsync/definitions": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

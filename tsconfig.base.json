@@ -14,11 +14,12 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "paths": {
-      "lsync-server": ["./packages/server/src/index.ts"],
-      "lsync-server/client": ["./packages/server/src/client.ts"],
-      "lsync-definition": ["./packages/definition/src/index.ts"],
-      "lsync-tanstack-db": ["./packages/tanstack-db/src/index.ts"],
-      "lsync-transport": ["./packages/transport/src/index.ts"]
+      "@lfsync/example-definition": ["./apps/example-definition/src/index.ts"],
+      "@lsync/server": ["./packages/server/src/index.ts"],
+      "@lsync/server/client": ["./packages/server/src/client.ts"],
+      "@lsync/definitions": ["./packages/definition/src/index.ts"],
+      "@lsync/client": ["./packages/tanstack-db/src/index.ts"],
+      "@lsync/transport": ["./packages/transport/src/index.ts"]
     }
   }
 }

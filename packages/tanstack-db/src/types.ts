@@ -23,7 +23,7 @@ import type {
   SyncChangesQueryInput as TransportSyncChangesQueryInput,
   SyncChangesResult as TransportSyncChangesResult,
   Update as TransportUpdate,
-} from "lsync-transport";
+} from "@lsync/transport";
 
 export type Update = TransportUpdate;
 export type ApiCall = TransportApiCall;

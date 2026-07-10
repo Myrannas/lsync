@@ -1,4 +1,4 @@
-import { defineCollections } from "lsync-definition";
+import { defineCollections } from "@lsync/definitions";
 import { z } from "zod";
 
 export const userSchema = z.object({

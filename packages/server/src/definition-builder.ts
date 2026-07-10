@@ -4,7 +4,7 @@ import type {
   CollectionDefinitions,
   CollectionPath,
   CollectionSet,
-} from "lsync-definition";
+} from "@lsync/definitions";
 import { authorizeApiCall } from "./access";
 import { collectionBuilder } from "./collection-builder";
 import { defaultCollectionApiPath } from "./collections";

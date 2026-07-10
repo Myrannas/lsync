@@ -3,18 +3,19 @@
 `lsync` uses one shared collection definition to keep schemas, keys, child paths, and document API
 contracts aligned across the server and client.
 
-| Package             | Purpose                                                                                  |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| `lsync-definition`  | Shared collection, child collection, key, and document API contracts.                    |
-| `lsync-server`      | Durable Object hosting, storage, indexes, access control, and document API handlers.     |
-| `lsync-tanstack-db` | TanStack DB collection types, sync modes, scoped children, and typed document API calls. |
+| Package              | Purpose                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `@lsync/definitions` | Shared collection, child collection, key, and document API contracts.                    |
+| `@lsync/server`      | Durable Object hosting, storage, indexes, access control, and document API handlers.     |
+| `@lsync/client`      | TanStack DB collection types, sync modes, scoped children, and typed document API calls. |
+| `@lsync/transport`   | Shared MessagePack wire contracts and transport helpers.                                 |
 
 ## Shared Definition
 
 Put the portable contract in a module imported by both environments:
 
 ```ts
-import { defineCollections } from "lsync-definition";
+import { defineCollections } from "@lsync/definitions";
 import { z } from "zod";
 
 export const todoSchema = z.object({
@@ -34,7 +35,7 @@ Add server-only behavior as overrides to the shared definition:
 
 ```ts
 import { appCollections } from "./definition";
-import { CollectionShardDurableObject, createWorkerHandler, type Env } from "lsync-server";
+import { CollectionShardDurableObject, createWorkerHandler, type Env } from "@lsync/server";
 
 const shardOptions = CollectionShardDurableObject.from(appCollections)
   .collection("todos", (todos) => todos.index("completed"))
@@ -55,7 +56,7 @@ Build typed collection managers from that same definition:
 
 ```ts
 import { appCollections } from "./definition";
-import { collectionTypesFrom } from "lsync-tanstack-db";
+import { collectionTypesFrom } from "@lsync/client";
 
 export const { todos } = collectionTypesFrom(appCollections)
   .url("ws://localhost:8787/sync/demo")

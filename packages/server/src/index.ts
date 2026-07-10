@@ -24,7 +24,7 @@ export {
   type ReadExpressionRow,
   type RefExpression,
   type ValExpression,
-} from "lsync-transport";
+} from "@lsync/transport";
 export { createWorkerHandler } from "./worker";
 export {
   collectionApiHandlers,

@@ -1,5 +1,5 @@
 import { createTRPCProxyClient, type TRPCLink } from "@trpc/client";
-import { parseServerMessage, sendClientRpcRequest, type ClientRpcRequest } from "lsync-transport";
+import { parseServerMessage, sendClientRpcRequest, type ClientRpcRequest } from "@lsync/transport";
 import { observable } from "@trpc/server/observable";
 import { ClientSubscriptions } from "./client-subscriptions";
 import { requestForOperation, takePending, type PendingRequest } from "./client-rpc";

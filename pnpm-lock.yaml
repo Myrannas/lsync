@@ -101,7 +101,7 @@ importers:
 
   apps/example-definition:
     dependencies:
-      lsync-definition:
+      '@lsync/definitions':
         specifier: workspace:*
         version: link:../../packages/definition
       zod:
@@ -123,6 +123,9 @@ importers:
       '@lfsync/example-definition':
         specifier: workspace:*
         version: link:../example-definition
+      '@lsync/client':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-db
       '@tailwindcss/vite':
         specifier: ^4.3.2
         version: 4.3.2(@voidzero-dev/vite-plus-core@0.2.2(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))
@@ -141,9 +144,6 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      lsync-tanstack-db:
-        specifier: workspace:*
-        version: link:../../packages/tanstack-db
       lucide-react:
         specifier: ^1.23.0
         version: 1.23.0(react@19.2.7)
@@ -187,7 +187,7 @@ importers:
       '@lfsync/example-definition':
         specifier: workspace:*
         version: link:../example-definition
-      lsync-server:
+      '@lsync/server':
         specifier: workspace:*
         version: link:../../packages/server
     devDependencies:
@@ -241,15 +241,15 @@ importers:
 
   packages/server:
     dependencies:
+      '@lsync/definitions':
+        specifier: workspace:*
+        version: link:../definition
+      '@lsync/transport':
+        specifier: workspace:*
+        version: link:../transport
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@6.0.3)
-      lsync-definition:
-        specifier: workspace:*
-        version: link:../definition
-      lsync-transport:
-        specifier: workspace:*
-        version: link:../transport
       sql-template-tag:
         specifier: ^5.2.1
         version: 5.2.1
@@ -272,6 +272,12 @@ importers:
 
   packages/tanstack-db:
     dependencies:
+      '@lsync/definitions':
+        specifier: workspace:*
+        version: link:../definition
+      '@lsync/transport':
+        specifier: workspace:*
+        version: link:../transport
       '@standard-schema/spec':
         specifier: 'catalog:'
         version: 1.1.0
@@ -284,12 +290,6 @@ importers:
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@6.0.3)
-      lsync-definition:
-        specifier: workspace:*
-        version: link:../definition
-      lsync-transport:
-        specifier: workspace:*
-        version: link:../transport
     devDependencies:
       typescript:
         specifier: 'catalog:'

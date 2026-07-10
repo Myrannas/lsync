@@ -1,4 +1,4 @@
-import { parseClientRpcRequest } from "lsync-transport";
+import { parseClientRpcRequest } from "@lsync/transport";
 import { router } from "./router";
 
 export function callRouter(

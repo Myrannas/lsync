@@ -1,4 +1,4 @@
-import { matchesReadPredicate, readExpressionRow } from "lsync-transport";
+import { matchesReadPredicate, readExpressionRow } from "@lsync/transport";
 import { accessRows, reduceAccessExpression, type ReferenceDependency } from "./access-expression";
 import { resolveCollection } from "./collections";
 import type {

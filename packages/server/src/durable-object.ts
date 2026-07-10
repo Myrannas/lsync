@@ -1,4 +1,4 @@
-import { parseClientRpcRequest, readRpcId, sendServerMessage } from "lsync-transport";
+import { parseClientRpcRequest, readRpcId, sendServerMessage } from "@lsync/transport";
 import {
   authorizeReadQuery,
   authorizeWriteBatch,
