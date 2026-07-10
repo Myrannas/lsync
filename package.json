@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "docs:api": "typedoc",
+    "docs:build": "vitepress build docs && typedoc",
+    "docs:dev": "vitepress dev docs",
+    "docs:preview": "vitepress preview docs",
     "dev:worker": "corepack pnpm --filter @lfsync/example-worker dev",
     "dev:react": "corepack pnpm --filter @lfsync/example-react dev",
     "e2e": "vp test run --config apps/integration-tests/vite.config.ts apps/integration-tests/test/smoke.e2e.ts",
@@ -12,9 +16,12 @@
   "devDependencies": {
     "@ast-grep/cli": "^0.44.1",
     "@cloudflare/workers-types": "catalog:",
+    "typedoc": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "vitepress": "catalog:",
+    "vue": "catalog:"
   },
   "packageManager": "pnpm@9.15.4",
   "pnpm": {

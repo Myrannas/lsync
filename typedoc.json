@@ -1,0 +1,26 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "lsync API",
+  "entryPoints": [
+    "packages/definition/src/index.ts",
+    "packages/server/src/index.ts",
+    "packages/server/src/client.ts",
+    "packages/tanstack-db/src/index.ts"
+  ],
+  "entryPointStrategy": "resolve",
+  "tsconfig": "tsconfig.typedoc.json",
+  "out": "docs/.vitepress/dist/api/reference",
+  "readme": "none",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "includeVersion": false,
+  "navigation": {
+    "includeFolders": false
+  },
+  "visibilityFilters": {
+    "protected": false,
+    "private": false,
+    "inherited": true,
+    "external": false
+  }
+}
