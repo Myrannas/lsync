@@ -2,13 +2,7 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   resolve: {
-    alias: {
-      "lsync-server/client": new URL("./packages/server/src/client.ts", import.meta.url).pathname,
-      "lsync-server": new URL("./packages/server/src/index.ts", import.meta.url).pathname,
-      "lsync-definition": new URL("./packages/definition/src/index.ts", import.meta.url).pathname,
-      "lsync-tanstack-db": new URL("./packages/tanstack-db/src/index.ts", import.meta.url).pathname,
-      "lsync-transport": new URL("./packages/transport/src/index.ts", import.meta.url).pathname,
-    },
+    tsconfigPaths: true,
   },
   run: {
     tasks: {

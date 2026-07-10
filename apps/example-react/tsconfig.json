@@ -5,7 +5,13 @@
     "jsx": "react-jsx",
     "noEmit": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@lfsync/example-definition": ["../example-definition/src/index.ts"],
+      "lsync-server": ["../../packages/server/src/index.ts"],
+      "lsync-server/client": ["../../packages/server/src/client.ts"],
+      "lsync-definition": ["../../packages/definition/src/index.ts"],
+      "lsync-tanstack-db": ["../../packages/tanstack-db/src/index.ts"],
+      "lsync-transport": ["../../packages/transport/src/index.ts"]
     },
     "types": ["vite/client"]
   },

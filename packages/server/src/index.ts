@@ -1,12 +1,5 @@
 export { CollectionShardDurableObject } from "./durable-object";
-export {
-  collectionBuilder,
-  collectionConfigsBuilder,
-  CollectionBuilder,
-  CollectionConfigsBuilder,
-  Collections,
-} from "./collection-builder";
-export { CollectionShardDefinitionBuilder, ServerCollectionBuilder } from "./definition-builder";
+export { collectionShardOptionsFrom } from "./definition-builder";
 export {
   and,
   compileReadExpression,

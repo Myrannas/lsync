@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 import { defineCollections } from "../../definition/src";
-import { CollectionTypes, type Client } from "../src";
+import type { Client } from "../src";
+import { CollectionTypes } from "../src/collection-type-builder";
 
 const projectSchema = z.object({
   id: z.string(),
