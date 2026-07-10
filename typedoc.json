@@ -5,16 +5,18 @@
     "packages/definition/src/index.ts",
     "packages/server/src/index.ts",
     "packages/server/src/client.ts",
-    "packages/tanstack-db/src/index.ts"
+    "packages/tanstack-db/src/index.ts",
+    "packages/transport/src/index.ts"
   ],
   "entryPointStrategy": "resolve",
   "tsconfig": "tsconfig.typedoc.json",
-  "out": "docs/.vitepress/dist/api/reference",
+  "out": "docs/public/api/reference/generated",
   "readme": "none",
   "excludePrivate": true,
   "excludeProtected": true,
   "includeVersion": false,
   "navigation": {
+    "includeGroups": true,
     "includeFolders": false
   },
   "visibilityFilters": {

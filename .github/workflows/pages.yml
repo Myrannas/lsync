@@ -34,6 +34,9 @@ jobs:
         env:
           DOCS_BASE: /${{ github.event.repository.name }}/
 
+      - name: Verify generated API reference
+        run: vp run docs:verify
+
       - uses: actions/upload-pages-artifact@v4
         with:
           path: docs/.vitepress/dist
