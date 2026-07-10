@@ -4,6 +4,7 @@ dist
 .wrangler
 docs/.vitepress/cache
 docs/.vitepress/dist
+docs/public/api/reference/generated
 .env
 .env.local
 *.tsbuildinfo
