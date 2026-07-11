@@ -1,4 +1,4 @@
-import { parseClientRpcRequest, readRpcId, sendServerMessage } from "@lsync/transport";
+import { parseClientMessage, readMessageId, sendServerMessage } from "@lsync/transport";
 import {
   authorizeReadQuery,
   authorizeWriteBatch,
@@ -8,10 +8,10 @@ import {
 import { normalizeCollection } from "./collection-normalize";
 import { collectionApiHandlers } from "./collections";
 import { collectionShardOptionsFrom } from "./definition-builder";
-import { callRouter } from "./durable-object-rpc";
+import { callRouter, isResyncRequired } from "./durable-object-rpc";
 import type { CollectionShardOptions, Env } from "./durable-object-types";
 import { persistSQLiteJsonBatchWithHistory, readSQLiteJsonChanges } from "./history";
-import { sendRpcError, sendRpcResult } from "./messages";
+import { sendProtocolError, sendResult } from "./messages";
 import { deduplicateMutations } from "./mutation-dedup";
 import { router } from "./router";
 import { assertSubscriptionAllowed, enforceRateLimit } from "./safeguards";
@@ -79,7 +79,7 @@ export class CollectionShardDurableObject implements DurableObject {
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
     try {
       await enforceRateLimit(ws, this.env, this.options.rateLimit);
-      const request = parseClientRpcRequest(message);
+      const request = parseClientMessage(message);
 
       const caller = router.createCaller({
         shardId: this.shardId(),
@@ -95,9 +95,18 @@ export class CollectionShardDurableObject implements DurableObject {
       });
 
       const result = await callRouter(caller, request);
-      sendRpcResult(ws, request.id, result);
+      if (request.type === "changes" && isResyncRequired(result)) {
+        sendProtocolError(ws, request.id, {
+          code: "RESYNC_REQUIRED",
+          message: "The requested change history is no longer available",
+          details: result,
+        });
+        return;
+      }
+
+      sendResult(ws, request.id, result);
     } catch (error) {
-      sendRpcError(ws, readRpcId(message), error);
+      sendProtocolError(ws, readMessageId(message), error);
     }
   }
 
@@ -111,20 +120,25 @@ export class CollectionShardDurableObject implements DurableObject {
 
     for (const socket of this.state.getWebSockets()) {
       const updates = this.subscribedUpdates(socket, batch);
-      const invalidations = this.subscribedInvalidations(socket, batch);
+      const attachment = webSocketAttachment(socket);
+      const invalidations = attachment
+        ? subscribedInvalidations(
+            attachment.subscriptions,
+            batch,
+            this.options.collections,
+            webSocketAuth(socket),
+            this.accessStore(),
+          )
+        : [];
       if (updates.length === 0 && invalidations.length === 0) continue;
 
       sendServerMessage(socket, {
-        method: "subscription",
-        params: {
-          path: "updates",
-          input: {
-            json: {
-              ...payload,
-              ...(invalidations.length > 0 ? { invalidations } : {}),
-              updates,
-            },
-          },
+        version: 1,
+        type: "updates",
+        payload: {
+          ...payload,
+          ...(invalidations.length > 0 ? { invalidations } : {}),
+          updates,
         },
       });
     }
@@ -268,19 +282,6 @@ export class CollectionShardDurableObject implements DurableObject {
         ? [{ ...visible, sequence: update.sequence, serverCreatedAt: update.serverCreatedAt }]
         : [];
     });
-  }
-
-  private subscribedInvalidations(ws: WebSocket, batch: SequencedBatch) {
-    const attachment = webSocketAttachment(ws);
-    if (!attachment || attachment.subscriptions.length === 0) return [];
-
-    return subscribedInvalidations(
-      attachment.subscriptions,
-      batch,
-      this.options.collections,
-      webSocketAuth(ws),
-      this.accessStore(),
-    );
   }
 
   private accessStore(): AccessStore {

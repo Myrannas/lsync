@@ -1,37 +1,30 @@
-import { parseClientRpcRequest } from "@lsync/transport";
-import { router } from "./router";
+import type { ParsedClientMessage } from "@lsync/transport";
+import type { Caller } from "./router";
+import type { SyncChangesResult } from "./types";
 
-export function callRouter(
-  caller: ReturnType<typeof router.createCaller>,
-  request: ReturnType<typeof parseClientRpcRequest>,
-): unknown {
-  if (request.method === "query" && request.params.path === "read") {
-    return caller.read(request.params.input.json);
+export async function callRouter(caller: Caller, request: ParsedClientMessage): Promise<unknown> {
+  switch (request.type) {
+    case "read":
+      return caller.read(request.input);
+    case "push":
+      return caller.push(request.input);
+    case "changes":
+      return caller.changes(request.input);
+    case "api":
+      return caller.api(request.input);
+    case "subscribe":
+      return caller.subscribe(request.input);
+    case "unsubscribe":
+      return caller.unsubscribe(request.input);
   }
+}
 
-  if (request.method === "query" && request.params.path === "changes") {
-    return caller.changes(request.params.input.json);
-  }
-
-  if (request.method === "subscribe") {
-    return caller.subscribe(request.params.input.json);
-  }
-
-  if (request.method === "unsubscribe") {
-    return caller.unsubscribe(request.params.input.json);
-  }
-
-  if (request.method !== "mutation") {
-    throw new Error("Unsupported operation");
-  }
-
-  if (request.params.path === "push") {
-    return caller.push(request.params.input.json);
-  }
-
-  if (request.params.path === "api") {
-    return caller.api(request.params.input.json);
-  }
-
-  throw new Error("Unsupported operation");
+export function isResyncRequired(
+  result: unknown,
+): result is Extract<SyncChangesResult, { type: "resyncRequired" }> {
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    (result as { type?: unknown }).type === "resyncRequired"
+  );
 }

@@ -135,7 +135,10 @@ describe("CollectionShardDurableObject subscriptions", () => {
 
     expect(socket.messages.map(parseMessage)).toContainEqual({
       id: "1",
+      version: 1,
+      type: "error",
       error: {
+        code: "VALIDATION_FAILED",
         message: "Unknown collection: /users/",
       },
     });
@@ -157,7 +160,10 @@ describe("CollectionShardDurableObject subscriptions", () => {
 
     expect(limited.socket.messages.map(parseMessage)).toContainEqual({
       id: "2",
+      version: 1,
+      type: "error",
       error: {
+        code: "CONFLICT",
         message: "Maximum subscriptions per WebSocket exceeded (1)",
       },
     });
@@ -188,7 +194,9 @@ describe("CollectionShardDurableObject subscriptions", () => {
 
     expect(socket.messages.map(parseMessage)).toContainEqual({
       id: "1",
-      error: { message: "Rate limit exceeded" },
+      version: 1,
+      type: "error",
+      error: { code: "RATE_LIMITED", message: "Rate limit exceeded" },
     });
     expect(socket.deserializeAttachment().subscriptions).toEqual([]);
   });

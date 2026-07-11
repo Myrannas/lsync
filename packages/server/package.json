@@ -37,7 +37,6 @@
   "dependencies": {
     "@lsync/definitions": "workspace:*",
     "@lsync/transport": "workspace:*",
-    "@trpc/server": "catalog:",
     "sql-template-tag": "^5.2.1",
     "zod": "catalog:"
   },
