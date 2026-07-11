@@ -20,7 +20,7 @@ interface ApplyBroadcastOptions<T extends object, TKey extends string | number> 
 
 export function applyCollectionBroadcast<T extends object, TKey extends string | number>(
   options: ApplyBroadcastOptions<T, TKey>,
-): void {
+): Array<ChangeMessageOrDeleteKeyMessage<T, TKey>> {
   if ((options.broadcast.invalidations ?? []).length > 0 && options.syncMode === "on-demand") {
     options.deleteKeys(options.subsets.clear());
   }
@@ -49,8 +49,9 @@ export function applyCollectionBroadcast<T extends object, TKey extends string |
     return ownUpdate || exists || tracked.after ? [toChangeMessage<T, TKey>(update, exists)] : [];
   });
 
-  if (changes.length === 0) return;
+  if (changes.length === 0) return [];
   options.begin();
   for (const change of changes) options.write(change);
   options.commit();
+  return changes;
 }

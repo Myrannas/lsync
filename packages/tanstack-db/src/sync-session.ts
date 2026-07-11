@@ -16,6 +16,8 @@ export interface SyncSessionOptions {
   initialize(): Promise<void>;
   resync(): Promise<void>;
   apply(broadcast: Broadcast): void;
+  hydrate?(): Promise<void>;
+  hydrated?(): void;
   synchronized(): void;
 }
 
@@ -55,7 +57,13 @@ export class SyncSession {
   }
 
   private async initialize(): Promise<void> {
+    if (this.options.hydrate) {
+      await this.options.hydrate();
+      if (this.isStopped()) return;
+      this.options.hydrated?.();
+    }
     await this.subscription?.ready;
+    if (this.isStopped()) return;
     const established = await this.options.client.changes({ collections: {} });
     this._state = "loading";
     await this.options.initialize();

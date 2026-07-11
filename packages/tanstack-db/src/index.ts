@@ -38,6 +38,7 @@ export type {
   ClientSubscription,
   CollectionConnectionOptions,
   CollectionOptions,
+  IndexedDBOfflineOptions,
   PushResult,
   ReadFilter,
   ReadFilterOperator,

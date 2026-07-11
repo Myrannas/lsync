@@ -16,7 +16,7 @@ import type {
   CollectionTypeApi,
   CollectionTypeConnection,
 } from "./collection-type-types";
-import type { Client } from "./types";
+import type { Client, IndexedDBOfflineOptions } from "./types";
 
 type BuilderIndexMode = NonNullable<BaseCollectionConfig<any, any, any>["autoIndex"]>;
 type BuilderIndexType = BaseCollectionConfig<any, any, any>["defaultIndexType"];
@@ -88,6 +88,10 @@ export class ClientCollectionBuilder<TDefinition> {
     return new ClientCollectionBuilder({ ...this.override, maxSyncRows });
   }
 
+  offline(options: IndexedDBOfflineOptions | true = true): ClientCollectionBuilder<TDefinition> {
+    return new ClientCollectionBuilder({ ...this.override, offline: options });
+  }
+
   index(
     autoIndex: BuilderIndexMode,
     defaultIndexType?: BuilderIndexType,
@@ -148,6 +152,7 @@ interface ClientCollectionOverride {
   maxSyncRows?: number | false;
   autoIndex?: BuilderIndexMode;
   defaultIndexType?: BuilderIndexType;
+  offline?: true | IndexedDBOfflineOptions;
 }
 
 function collectionTypeFromDefinition(

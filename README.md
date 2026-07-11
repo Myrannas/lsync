@@ -80,10 +80,11 @@ export const { todos } = collectionTypesFrom(appCollections)
 ```
 
 Use `sync("on-demand")` when active TanStack DB queries should determine the server-side subset.
-Use `sync("eager")` when a small collection should hydrate in full at startup.
+Use `sync("eager")` when a small collection should hydrate in full at startup. Chain
+`.offline()` after eager sync to hydrate its last server snapshot from IndexedDB before connecting.
 
 The [guide](https://myrannas.github.io/lsync/guide/) continues with live queries, nested
-collections, offline intent queues, document APIs, and access-management patterns.
+collections, IndexedDB caches, offline intent queues, document APIs, and access-management patterns.
 
 ## Development
 
