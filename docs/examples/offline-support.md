@@ -1,4 +1,4 @@
-# Offline Support
+# Offline support
 
 `lsync` can cache eager collection snapshots in IndexedDB. Cached rows hydrate TanStack DB before
 the WebSocket connects, so previously synchronized data is available immediately after a reload or
@@ -48,13 +48,13 @@ that metadata could incorrectly claim that a partial subset is complete.
 
 This feature is a durable read cache, not a durable mutation queue. TanStack DB still applies local
 mutations optimistically, and a failed push rolls back as usual. If users need to write while
-offline, persist domain intents separately and replay idempotently:
+offline, persist domain intents separately and replay them idempotently:
 
-1. Give each browser profile a stable `clientId`.
+1. Assign each browser profile a stable `clientId`.
 2. Persist pending user intents when offline or when a mutation fails.
 3. Replay idempotent intents when the browser returns online.
 
-## Stable Client Identity for Intent Replay
+## Stable client identity for intent replay
 
 ```ts
 import { appCollections } from "./definition";
@@ -74,7 +74,7 @@ export const { todos } = collectionTypesFrom(appCollections)
   .build();
 ```
 
-## Persistent Intent Queue
+## Persistent intent queue
 
 ```ts
 type PendingTodoIntent =
@@ -115,4 +115,4 @@ window.addEventListener("online", async () => {
 ```
 
 Use operation IDs or domain-level document APIs to make replay idempotent. Optimistic in-memory
-mutation state is not itself a durable offline queue.
+mutation state alone is not a durable offline queue.

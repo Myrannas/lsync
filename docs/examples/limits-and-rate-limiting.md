@@ -1,21 +1,20 @@
-# Limits And Rate Limiting
+# Limits and rate limiting
 
-Use the built-in limits to keep an accidental eager sync or a noisy WebSocket client from doing
-unbounded work. The defaults protect normal deployments without changing the shared collection
-contract.
+Built-in limits prevent an accidental eager sync or a noisy WebSocket client from doing unbounded
+work. The defaults protect normal deployments without changing the shared collection contract.
 
-## Default Limits
+## Default limits
 
-| Limit                         | Default     | Where it applies                                     |
+| Limit                         | Default     | Applies to                                           |
 | ----------------------------- | ----------- | ---------------------------------------------------- |
 | Eager initial sync            | 10,000 rows | Each client collection during its initial hydration. |
 | Subscriptions                 | 100         | Distinct collection scopes on one WebSocket.         |
 | Rows returned by one read RPC | 1,000 rows  | Each server read; eager sync pages across read RPCs. |
 
-On-demand collections only load the subsets needed by active queries, so prefer on-demand sync for
-collections that can grow without a clear bound.
+On-demand collections load only the subsets needed by active queries, so use on-demand sync for
+collections without a clear size bound.
 
-## Control Eager Sync Size
+## Limit eager sync size
 
 Eager sync reads in pages and fails before committing the initial result when the collection is
 larger than 10,000 rows:
@@ -28,7 +27,7 @@ const { settings, auditLog } = collectionTypesFrom(appCollections)
   .build();
 ```
 
-Use `maxSyncRows(false)` only when hydrating an unbounded collection is an intentional tradeoff:
+Set `maxSyncRows(false)` only when loading an unbounded collection is an intentional tradeoff:
 
 ```ts
 .collection("referenceData", (collection) =>
@@ -36,10 +35,10 @@ Use `maxSyncRows(false)` only when hydrating an unbounded collection is an inten
 )
 ```
 
-An explicit `read.limit` remains the direct limit for that initial read. The `maxSyncRows` safeguard
-applies when eager sync would otherwise read the full collection.
+An explicit `read.limit` still limits the initial read. The `maxSyncRows` safeguard applies when
+eager sync would otherwise read the full collection.
 
-## Limit Subscriptions Per WebSocket
+## Limit subscriptions per WebSocket
 
 The server accepts up to 100 distinct collection scopes per WebSocket by default. Re-subscribing to
 an existing scope does not consume another slot.
@@ -50,12 +49,12 @@ const shardOptions = CollectionShardDurableObject.from(appCollections)
   .build();
 ```
 
-Set `maxSubscriptionsPerWebSocket` to `false` to disable this protection for a trusted deployment.
+Set `maxSubscriptionsPerWebSocket` to `false` to disable this limit for a trusted deployment.
 
-## Add Cloudflare Managed Rate Limiting
+## Add Cloudflare managed rate limiting
 
 Add a [Cloudflare Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
-to the Worker. The period must be either 10 or 60 seconds:
+to the Worker. The period must be 10 or 60 seconds:
 
 ```toml
 [[ratelimits]]
@@ -67,7 +66,7 @@ limit = 100
 period = 60
 ```
 
-Then apply the binding before each WebSocket RPC message is parsed and handled:
+Apply the binding before each WebSocket RPC message is parsed and handled:
 
 ```ts
 import { CollectionShardDurableObject, cloudflareRateLimiter, type Env } from "@lsync/server";
@@ -97,11 +96,11 @@ export class CollectionShard extends CollectionShardDurableObject {
 Use a stable authenticated user or tenant identifier for the rate-limit key. The fallback
 `clientId` is supplied by the client and can be rotated, so it is weaker abuse protection.
 
-Cloudflare's managed counters are location-local, permissive, and eventually consistent. They are
-designed to limit abuse without meaningful added latency, not to provide exact accounting or
-billing enforcement. A rejected WebSocket RPC receives a `Rate limit exceeded` error.
+Cloudflare's managed counters are location-local and eventually consistent. They are designed to
+limit abuse with low latency, not to provide exact usage accounting or billing enforcement. A
+rejected WebSocket RPC receives a `Rate limit exceeded` error.
 
-## Choosing A Policy
+## Choose a policy
 
 - Use on-demand sync for large or user-filtered collections.
 - Keep eager sync capped for settings, reference data, and other bounded collections.

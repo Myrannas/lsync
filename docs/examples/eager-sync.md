@@ -1,7 +1,7 @@
-# Eager Sync
+# Eager sync
 
-Use eager sync when a collection is small enough to hydrate in full or when most screens need the
-same rows.
+Use eager sync when a collection is small enough to load in full or when most screens need the same
+rows.
 
 ```ts
 import { appCollections } from "./definition";
@@ -13,8 +13,8 @@ export const { settings } = collectionTypesFrom(appCollections)
   .build();
 ```
 
-An eager collection performs an initial server read for the full collection, marks itself ready,
-and then applies subscription updates.
+An eager collection reads the full collection from the server, marks itself ready, and then applies
+subscription updates.
 
 ```tsx
 import { useLiveQuery } from "@tanstack/react-db";
@@ -37,7 +37,7 @@ export function SettingsPanel() {
 }
 ```
 
-Use eager sync deliberately for low-cardinality collections such as user settings and reference
-tables. Eager sync is capped at 10,000 rows by default; see
-[Limits And Rate Limiting](/examples/limits-and-rate-limiting) to choose a different cap or move a
+Use eager sync for bounded collections such as user settings and reference tables. It is capped at
+10,000 rows by default; see
+[Limits and rate limiting](/examples/limits-and-rate-limiting) to choose a different cap or move a
 growing collection to on-demand sync.

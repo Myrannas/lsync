@@ -1,7 +1,7 @@
 # Guide
 
-`lsync` uses one shared collection definition to keep schemas, keys, child paths, and document API
-contracts aligned across the server and client.
+`lsync` uses one shared collection definition for schemas, keys, child paths, and document API
+contracts on both the server and client.
 
 | Package              | Purpose                                                                                  |
 | -------------------- | ---------------------------------------------------------------------------------------- |
@@ -10,9 +10,9 @@ contracts aligned across the server and client.
 | `@lsync/client`      | TanStack DB collection types, sync modes, scoped children, and typed document API calls. |
 | `@lsync/transport`   | Shared MessagePack wire contracts and transport helpers.                                 |
 
-## Shared Definition
+## Shared definition
 
-Put the portable contract in a module imported by both environments:
+Keep the shared contract in a module imported by both environments:
 
 ```ts
 import { defineCollections } from "@lsync/definitions";
@@ -29,9 +29,9 @@ export const appCollections = defineCollections()
   .build();
 ```
 
-## Server Shape
+## Server configuration
 
-Add server-only behavior as overrides to the shared definition:
+Add server-only configuration as overrides to the shared definition:
 
 ```ts
 import { appCollections } from "./definition";
@@ -50,9 +50,9 @@ export class CollectionShard extends CollectionShardDurableObject {
 export default createWorkerHandler();
 ```
 
-## Client Shape
+## Client configuration
 
-Build typed collection managers from that same definition:
+Create typed collection managers from the same definition:
 
 ```ts
 import { appCollections } from "./definition";
@@ -65,9 +65,9 @@ export const { todos } = collectionTypesFrom(appCollections)
 ```
 
 Use `sync("on-demand")` for filtered subsets and `sync("eager")` when the full collection should
-hydrate at startup. See the examples for document APIs, offline intent queues, and access rules.
+load at startup. The examples cover document APIs, offline intent queues, and access rules.
 
-## API Reference
+## API reference
 
-Browse the [API reference](/api/reference/) for the public types, classes, and functions exposed by
-each package.
+The [API reference](/api/reference/) lists the public types, classes, and functions exposed by each
+package.

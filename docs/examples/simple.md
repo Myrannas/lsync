@@ -1,9 +1,9 @@
-# Simple Case
+# Basic setup
 
-This is the smallest useful setup: one shared definition, a Worker-backed sync endpoint, and a
-TanStack DB live query.
+This example combines a shared definition, a Worker-backed sync endpoint, and a TanStack DB live
+query.
 
-## Shared Definition
+## Shared definition
 
 ```ts
 import { defineCollections } from "@lsync/definitions";

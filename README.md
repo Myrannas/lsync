@@ -2,9 +2,9 @@
 
 Lightweight sync for local-first collections.
 
-`lsync` is an experimental data sync library that combines a Cloudflare Durable Object sync
-server with TanStack DB client adapters. It keeps collection schemas, keys, child paths, and
-document APIs aligned through one shared definition.
+`lsync` is an experimental sync library that combines a Cloudflare Durable Object server with
+TanStack DB client adapters. A shared definition keeps collection schemas, keys, child paths, and
+document APIs consistent between the server and client.
 
 [Documentation](https://myrannas.github.io/lsync/) ·
 [Examples](https://myrannas.github.io/lsync/examples/simple) ·
@@ -13,12 +13,12 @@ document APIs aligned through one shared definition.
 
 ## Why lsync?
 
-- **Durable Object backed.** Store collection rows and sync history in Cloudflare Durable Object
-  SQLite storage.
-- **TanStack DB native.** Use live queries, optimistic local writes, eager sync, and query-driven
-  on-demand subsets.
-- **One shared contract.** Define schemas, keys, child collections, and document APIs once, then
-  derive the server and client configuration from it.
+- **Cloudflare Durable Objects.** Store collection rows and sync history in Durable Object SQLite
+  storage.
+- **TanStack DB integration.** Use live queries, optimistic local writes, eager sync, and
+  query-driven on-demand subsets.
+- **Shared contract.** Define schemas, keys, child collections, and document APIs once, then derive
+  the server and client configuration from that definition.
 
 ## Packages
 
@@ -31,7 +31,7 @@ document APIs aligned through one shared definition.
 
 ## Quick start
 
-Define a portable contract that both the Worker and application can import:
+Define the contract in a module that both the Worker and application can import:
 
 ```ts
 import { defineCollections } from "@lsync/definitions";
@@ -48,7 +48,7 @@ export const appCollections = defineCollections()
   .build();
 ```
 
-Add server-only behavior as overrides to the shared definition:
+Add server-only configuration as overrides to the shared definition:
 
 ```ts
 import { appCollections } from "./definition";
@@ -67,7 +67,7 @@ export class CollectionShard extends CollectionShardDurableObject {
 export default createWorkerHandler();
 ```
 
-Build typed TanStack DB collection managers from the same definition:
+Create typed TanStack DB collection managers from the same definition:
 
 ```ts
 import { appCollections } from "./definition";
@@ -80,11 +80,11 @@ export const { todos } = collectionTypesFrom(appCollections)
 ```
 
 Use `sync("on-demand")` when active TanStack DB queries should determine the server-side subset.
-Use `sync("eager")` when a small collection should hydrate in full at startup. Chain
+Use `sync("eager")` when a small collection should load in full at startup. Chain
 `.offline()` after eager sync to hydrate its last server snapshot from IndexedDB before connecting.
 
-The [guide](https://myrannas.github.io/lsync/guide/) continues with live queries, nested
-collections, IndexedDB caches, offline intent queues, document APIs, and access-management patterns.
+The [guide](https://myrannas.github.io/lsync/guide/) covers live queries, nested collections,
+IndexedDB caches, offline intent queues, document APIs, and access-control patterns.
 
 ## Development
 
@@ -119,9 +119,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow.
 
 ## Status
 
-`lsync` is experimental and its public API may change before a stable release. The WebSocket
-transport is designed for Cloudflare Durable Object hibernation; local mutations are optimistic,
-while server echoes reconcile accepted sync state and active subsets.
+`lsync` is experimental, and its public API may change before a stable release. The WebSocket
+transport supports Cloudflare Durable Object hibernation. Local mutations are optimistic; server
+echoes reconcile accepted changes and active subsets.
 
 ## License
 
