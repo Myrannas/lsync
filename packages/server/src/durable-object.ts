@@ -12,6 +12,7 @@ import { callRouter } from "./durable-object-rpc";
 import type { CollectionShardOptions, Env } from "./durable-object-types";
 import { persistSQLiteJsonBatchWithHistory, readSQLiteJsonChanges } from "./history";
 import { sendRpcError, sendRpcResult } from "./messages";
+import { deduplicateMutations } from "./mutation-dedup";
 import { router } from "./router";
 import { updateSocketSubscriptions, webSocketAttachment, webSocketAuth } from "./socket-attachment";
 import { readSQLiteJsonRow, readSQLiteJsonRows } from "./storage";
@@ -214,8 +215,9 @@ export class CollectionShardDurableObject implements DurableObject {
   }
 
   private mutate(batch: Batch, auth: AccessAuth = {}): PushResult {
-    this.validate(batch);
-    authorizeWriteBatch(batch, this.options.collections, auth, this.accessStore());
+    const pending = deduplicateMutations(this.state.storage.sql, batch);
+    this.validate(pending);
+    authorizeWriteBatch(pending, this.options.collections, auth, this.accessStore());
     const persisted = this.persist(batch);
     this.publish(persisted);
     return { accepted: batch.updates.length, watermark: persisted.watermark };

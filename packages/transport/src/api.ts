@@ -99,6 +99,7 @@ const syncChangesPageResultSchema = z.object({
   updates: z.array(sequencedUpdateSchema),
   watermark: z.number().int().nonnegative(),
   hasMore: z.boolean(),
+  cursors: z.record(z.string(), z.number().int().nonnegative()).optional(),
 });
 
 const syncChangesResyncRequiredResultSchema = z.object({

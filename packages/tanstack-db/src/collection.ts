@@ -5,10 +5,12 @@ import type {
   TransactionWithMutations,
 } from "@tanstack/db";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { createBatch, toChangeMessage } from "./batch";
+import { createBatch } from "./batch";
 import { acquireSharedClient } from "./client";
+import { applyCollectionBroadcast } from "./collection-broadcast";
 import { initialReadQuery, readQueryForSubset, subsetId } from "./read-query";
-import type { CollectionOptions } from "./types";
+import { SyncSession } from "./sync-session";
+import type { CollectionOptions, ReadQuery } from "./types";
 import { SubsetTracker, writeRows } from "./subsets";
 
 export function collectionOptions<
@@ -63,11 +65,12 @@ export function collectionOptions<
       : {}),
     getKey: options.getKey,
     sync: {
-      sync: ({ begin, write, commit, markReady, collection }) => {
+      sync: ({ begin, write, commit, markReady, truncate, collection }) => {
         const subsets = new SubsetTracker<T, TKey>(options.getKey);
         activeSubsets = subsets;
         const subsetGcTime = options.gcTime ?? 300000;
         const retentionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+        const subsetQueries = new Map<string, ReadQuery>();
         const deleteKeys = (keys: Array<TKey>) => {
           if (keys.length === 0) return;
 
@@ -99,57 +102,62 @@ export function collectionOptions<
             id,
             setTimeout(() => {
               retentionTimers.delete(id);
+              subsetQueries.delete(id);
               deleteKeys(subsets.expire(id));
             }, subsetGcTime),
           );
         };
-        const subscription = client.subscribe(options.collection, (broadcast) => {
-          if ((broadcast.invalidations ?? []).length > 0 && options.syncMode === "on-demand") {
-            deleteKeys(subsets.clear());
-          }
-
-          const changes = broadcast.updates.flatMap((update) => {
-            if (update.collection !== options.collection) return [];
-            const ownUpdate = update.clientId === client.clientId;
-            if ((options.ignoreOwnUpdates ?? false) && ownUpdate) {
-              return [];
-            }
-
-            if (options.syncMode !== "on-demand") {
-              return [toChangeMessage<T, TKey>(update, collection.has(update.key as TKey))];
-            }
-
-            const key = update.key as TKey;
-            const exists = collection.has(key);
-            if (update.type === "delete") {
-              subsets.deleteKey(key);
-              return exists ? [{ type: "delete" as const, key }] : [];
-            }
-
-            const current = collection.get(key) as T | undefined;
-            const row =
-              update.type === "update" && current
-                ? ({ ...current, ...(update.value as Partial<T>) } as T)
-                : (update.value as T);
-            const tracked = subsets.reconcileRow(row);
-
-            if (ownUpdate || exists || tracked.after) {
-              return [toChangeMessage<T, TKey>(update, exists)];
-            }
-
-            return [];
-          });
-
-          if (changes.length === 0) {
-            return;
-          }
-
+        const initialQuery = initialReadQuery(options.collection, options.read);
+        const loadEager = async (replace = false) => {
+          if (replace) truncate();
+          if (!initialQuery) return;
+          const result = await client.read<T>(initialQuery);
+          if (result.rows.length === 0) return;
           begin();
-          for (const change of changes) {
-            write(change);
-          }
+          writeRows(collection, result.rows, options.getKey, write);
           commit();
+        };
+        const reloadSubsets = async () => {
+          for (const [id, query] of subsetQueries) {
+            const result = await client.read<T>(query);
+            const removedKeys = subsets.replace(
+              id,
+              result.rows,
+              query.filters ?? [],
+              query.predicate,
+            );
+            begin();
+            writeRows(collection, result.rows, options.getKey, write);
+            for (const key of removedKeys) write({ type: "delete", key });
+            commit();
+          }
+        };
+        let markedReady = false;
+        const session = new SyncSession({
+          client,
+          collection: options.collection,
+          initialize: () => (options.syncMode === "on-demand" ? Promise.resolve() : loadEager()),
+          resync: () => (options.syncMode === "on-demand" ? reloadSubsets() : loadEager(true)),
+          apply: (broadcast) =>
+            applyCollectionBroadcast({
+              broadcast,
+              collectionName: options.collection,
+              clientId: client.clientId,
+              ignoreOwnUpdates: options.ignoreOwnUpdates ?? false,
+              syncMode: options.syncMode === "on-demand" ? "on-demand" : "eager",
+              collection,
+              subsets,
+              begin,
+              write,
+              commit,
+              deleteKeys,
+            }),
+          synchronized: () => {
+            if (!markedReady) markReady();
+            markedReady = true;
+          },
         });
+        void session.start();
 
         const readSubset = (subsetOptions: LoadSubsetOptions): true | Promise<void> => {
           const id = subsetId(subsetOptions);
@@ -165,8 +173,9 @@ export function collectionOptions<
               options.read === false ? undefined : options.read,
               subsetOptions,
             );
-            await subscription.ready;
+            await session.start();
             const result = await client.read<T>(query);
+            subsetQueries.set(id, query);
             const removedKeys = subsets.replace(
               id,
               result.rows,
@@ -187,7 +196,6 @@ export function collectionOptions<
         };
 
         if (options.syncMode === "on-demand") {
-          markReady();
           return {
             loadSubset: readSubset,
             unloadSubset: (subsetOptions: LoadSubsetOptions) => {
@@ -195,46 +203,30 @@ export function collectionOptions<
               const removedKeys = subsets.release(id, subsetGcTime !== 0);
               deleteKeys(removedKeys);
               if (removedKeys.length === 0) scheduleRetention(id);
+              else subsetQueries.delete(id);
             },
             cleanup: () => {
               retentionTimers.forEach((timer) => {
                 clearTimeout(timer);
               });
               retentionTimers.clear();
+              subsetQueries.clear();
               subsets.clear();
               if (activeSubsets === subsets) {
                 activeSubsets = undefined;
               }
-              subscription.unsubscribe();
-              lease?.release();
+              session.stop();
+              lease?.[Symbol.dispose]();
             },
           };
-        }
-
-        const initialQuery = initialReadQuery(options.collection, options.read);
-        if (!initialQuery) {
-          void subscription.ready.then(() => {
-            markReady();
-          });
-        } else {
-          void subscription.ready
-            .then(() => client.read<T>(initialQuery))
-            .then((result) => {
-              if (result.rows.length > 0) {
-                begin();
-                writeRows(collection, result.rows, options.getKey, write);
-                commit();
-              }
-              markReady();
-            });
         }
 
         return () => {
           if (activeSubsets === subsets) {
             activeSubsets = undefined;
           }
-          subscription.unsubscribe();
-          lease?.release();
+          session.stop();
+          lease?.[Symbol.dispose]();
         };
       },
       rowUpdateMode: "partial",

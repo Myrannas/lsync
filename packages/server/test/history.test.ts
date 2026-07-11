@@ -43,6 +43,51 @@ describe("sync history", () => {
     });
   });
 
+  it("deduplicates a retried mutation id without applying it twice", () => {
+    const sql = new FakeSql();
+    const input = {
+      updates: [
+        {
+          id: "stable-mutation-id",
+          collection: "todos",
+          key: "1",
+          type: "insert" as const,
+          value: { id: "1", text: "Once", completed: false },
+          createdAt: Date.UTC(2026, 0, 1),
+        },
+      ],
+    };
+
+    const first = persistSQLiteJsonBatchWithHistory(sql, input, collections);
+    const retry = persistSQLiteJsonBatchWithHistory(sql, input, collections);
+
+    expect(first.updates).toHaveLength(1);
+    expect(retry).toEqual({ updates: [], watermark: 1 });
+    expect(sql.changes).toHaveLength(1);
+    expect(sql.rows.get("/todos/:1")?.version).toBe(1);
+  });
+
+  it("rejects reuse of a mutation id with a different payload", () => {
+    const sql = new FakeSql();
+    const update = {
+      id: "reused-id",
+      collection: "todos",
+      key: "1",
+      type: "insert" as const,
+      value: { id: "1", text: "Original", completed: false },
+      createdAt: Date.UTC(2026, 0, 1),
+    };
+    persistSQLiteJsonBatchWithHistory(sql, { updates: [update] }, collections);
+
+    expect(() =>
+      persistSQLiteJsonBatchWithHistory(
+        sql,
+        { updates: [{ ...update, value: { ...update.value, text: "Different" } }] },
+        collections,
+      ),
+    ).toThrow("Mutation id reused with a different payload: reused-id");
+  });
+
   it("reads catch-up changes by collection cursor in sequence order", () => {
     const sql = new FakeSql();
 

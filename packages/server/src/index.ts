@@ -1,3 +1,9 @@
+/**
+ * Durable Object storage, synchronization, access control, and Worker APIs.
+ *
+ * @module @lsync/server
+ */
+
 export { CollectionShardDurableObject } from "./durable-object";
 export { collectionShardOptionsFrom } from "./definition-builder";
 export {
@@ -46,6 +52,7 @@ export {
 export {
   persistSQLiteJsonBatchWithHistory,
   readSQLiteJsonChanges,
+  SQLITE_JSON_CONFLICT_POLICY,
   type HistoryOptions,
   type SequencedBatch,
 } from "./history";

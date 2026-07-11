@@ -60,7 +60,16 @@ export type ReadResult<T = unknown> = TransportReadResult<T>;
 export interface ClientOptions {
   url: string | URL;
   clientId?: string;
-  reconnect?: boolean;
+  reconnect?: boolean | ReconnectOptions;
+  connectionTimeoutMs?: number;
+  requestTimeoutMs?: number;
+}
+
+export interface ReconnectOptions {
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  multiplier?: number;
+  maxAttempts?: number;
 }
 
 export type CollectionConnectionOptions =
@@ -108,5 +117,7 @@ export interface Client<TApi extends ApiContract = ApiContract> {
 
 export interface ClientSubscription {
   readonly ready: Promise<void>;
+  onDisconnect?(listener: () => void): () => void;
+  onReconnect?(listener: () => void): () => void;
   unsubscribe(): void;
 }

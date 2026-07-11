@@ -7,7 +7,6 @@ export default defineConfig({
   title: "lsync",
   description: "Lightweight sync for TanStack DB and Cloudflare Durable Objects.",
   cleanUrls: true,
-  ignoreDeadLinks: [/^\/api\/reference\//],
   lastUpdated: true,
   markdown: {
     codeTransformers: [],

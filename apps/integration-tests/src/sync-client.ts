@@ -31,7 +31,7 @@ export interface TodoRow {
 
 export interface SyncClient {
   health(): Promise<{ collections: Array<string> }>;
-  pushTodo(todo: TodoRow): Promise<{ accepted: number; watermark: number }>;
+  pushTodo(todo: TodoRow, mutationId?: string): Promise<{ accepted: number; watermark: number }>;
   readTodo(id: string): Promise<TodoRow | undefined>;
   close(): void;
 }
@@ -41,11 +41,11 @@ export async function openSyncClient(url: string): Promise<SyncClient> {
 
   return {
     health: () => callApi(ws, "todos.health"),
-    pushTodo: (todo) =>
+    pushTodo: (todo, mutationId = `insert-${todo.id}`) =>
       request(ws, "push", {
         updates: [
           {
-            id: `insert-${todo.id}`,
+            id: mutationId,
             collection: todosCollection,
             key: todo.id,
             type: "insert",

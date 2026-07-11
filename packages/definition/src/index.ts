@@ -1,3 +1,9 @@
+/**
+ * Shared collection definitions and API contracts.
+ *
+ * @module @lsync/definitions
+ */
+
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 export type SchemaOutput<TSchema extends StandardSchemaV1> =
