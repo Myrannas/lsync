@@ -4,13 +4,14 @@ import { collectionScope, firstNewPathParam, type CollectionScopeParams } from "
 import { collectionOptions } from "./collection";
 import { acquireSharedClient } from "./client";
 import { defaultCollectionApiPath } from "./collection-api";
+import { CollectionCache } from "./collection-type-cache";
+import { collectionConfig } from "./collection-type-config";
 import type {
   ChildCollectionTypeOptions,
   ChildManagers,
   CollectionApiMethod,
   CollectionApiMethods,
   CollectionTypeApi,
-  CollectionCache,
   CollectionCacheEntry,
   CollectionEntity,
   CollectionType,
@@ -79,7 +80,7 @@ export function createCollectionTypeFromOptions<
     options,
     connection,
     {},
-    new Map(),
+    new CollectionCache(options.maxCachedCollections),
   ).api();
 }
 
@@ -101,6 +102,7 @@ class CollectionTypeManager<
     const base = {
       all: (params: CollectionScopeParams = {}) => this.all(params),
       delete: (...args: Parameters<Collection<T, TKey>["delete"]>) => this.all({}).delete(...args),
+      dispose: () => this.dispose(),
       insert: (...args: Parameters<Collection<T, TKey>["insert"]>) => this.all({}).insert(...args),
       with: (params: CollectionScopeParams) => this.with(params),
       withId: (id: TKey, childParam?: string) => this.withId(id, childParam),
@@ -124,6 +126,8 @@ class CollectionTypeManager<
     if (existing) {
       existing.usage.accessCount += 1;
       existing.usage.lastAccessedAt = Date.now();
+      this.cache.touch(key, existing);
+      this.cache.evictInactive(key);
       return existing.collection;
     }
 
@@ -147,6 +151,7 @@ class CollectionTypeManager<
     };
 
     this.cache.set(key, { collection, usage });
+    this.cache.evictInactive(key);
     return collection;
   }
 
@@ -175,6 +180,10 @@ class CollectionTypeManager<
 
   private usage(): Array<CollectionUsage> {
     return [...this.cache.values()].map((entry) => ({ ...entry.usage }));
+  }
+
+  private async dispose(): Promise<void> {
+    await this.cache.dispose();
   }
 
   private apiMethods(): CollectionApiMethods<TApi> {
@@ -231,21 +240,6 @@ class CollectionTypeManager<
     const param = childParam ?? firstChildParam(this.options);
     return param ? { ...this.params, [param]: id } : this.params;
   }
-}
-
-function collectionConfig<
-  T extends object,
-  TKey extends string | number,
-  TSchema extends StandardSchemaV1,
->(options: CollectionTypeBaseOptions<T, TKey, TSchema, any, any>) {
-  const { api, children, id, name, parentParam, path, ...config } = options;
-  void api;
-  void children;
-  void id;
-  void name;
-  void parentParam;
-  void path;
-  return config;
 }
 
 function withChildren<TTarget extends object, TChildren extends CollectionTypeChildren>(

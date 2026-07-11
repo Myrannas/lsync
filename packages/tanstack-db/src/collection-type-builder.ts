@@ -101,6 +101,12 @@ export class CollectionTypeBuilder<
     return this.next({ maxSyncRows });
   }
 
+  maxCachedCollections(
+    maxCachedCollections: number,
+  ): CollectionTypeBuilder<T, TKey, TSchema, TChildren, TApi> {
+    return this.next({ maxCachedCollections });
+  }
+
   index(
     autoIndex: BuilderIndexMode,
     defaultIndexType?: BuilderIndexType,

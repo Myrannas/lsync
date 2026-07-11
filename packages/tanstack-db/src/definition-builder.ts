@@ -92,6 +92,10 @@ export class ClientCollectionBuilder<TDefinition> {
     return new ClientCollectionBuilder({ ...this.override, offline: options });
   }
 
+  maxCachedCollections(maxCachedCollections: number): ClientCollectionBuilder<TDefinition> {
+    return new ClientCollectionBuilder({ ...this.override, maxCachedCollections });
+  }
+
   index(
     autoIndex: BuilderIndexMode,
     defaultIndexType?: BuilderIndexType,
@@ -153,6 +157,7 @@ interface ClientCollectionOverride {
   autoIndex?: BuilderIndexMode;
   defaultIndexType?: BuilderIndexType;
   offline?: true | IndexedDBOfflineOptions;
+  maxCachedCollections?: number;
 }
 
 function collectionTypeFromDefinition(
