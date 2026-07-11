@@ -1,6 +1,9 @@
-import { createTRPCProxyClient, type TRPCLink } from "@trpc/client";
-import { parseServerMessage, sendClientRpcRequest, type ClientRpcRequest } from "@lsync/transport";
-import { observable } from "@trpc/server/observable";
+import {
+  parseServerMessage,
+  ProtocolError,
+  sendClientMessage,
+  type ClientMessage,
+} from "@lsync/transport";
 import { ClientSubscriptions } from "./client-subscriptions";
 import {
   ConnectionClosedError,
@@ -10,7 +13,7 @@ import {
   retryableMutationError,
   wait,
 } from "./client-reconnect";
-import { rejectPending, requestForOperation, takePending, type PendingRequest } from "./client-rpc";
+import { rejectPending, takePending, type PendingRequest } from "./client-rpc";
 import type {
   ApiCall,
   ApiCallArgs,
@@ -27,8 +30,6 @@ import type {
   SyncChangesQuery,
   SyncChangesResult,
 } from "./types";
-
-type Router = any;
 
 export { acquireSharedClient } from "./client-shared";
 
@@ -50,13 +51,8 @@ export function createClient<TApi extends ApiContract = ApiContract>(
 
   const open = async (): Promise<WebSocket> => {
     if (closed) throw new ConnectionClosedError("Sync client is closed");
-    if (socket?.readyState === WebSocket.OPEN) {
-      return socket;
-    }
-
-    if (connectPromise) {
-      return connectPromise;
-    }
+    if (socket?.readyState === WebSocket.OPEN) return socket;
+    if (connectPromise) return connectPromise;
 
     const connect = async (): Promise<WebSocket> => {
       const attempts = reconnect.enabled ? reconnect.maxAttempts : 1;
@@ -104,29 +100,19 @@ export function createClient<TApi extends ApiContract = ApiContract>(
         ws.addEventListener("message", (event) => {
           const message = parseServerMessage(event.data);
 
-          if ("method" in message) {
-            subscriptions.dispatch(message.params.input.json);
+          if (message.type === "updates") {
+            subscriptions.dispatch(message.payload);
             return;
           }
 
-          if ("error" in message) {
+          if (message.type === "error") {
             const request = takePending(pending, message.id);
-
-            if (!request) {
-              return;
-            }
-
-            request.reject(new Error(message.error.message));
+            request?.reject(new ProtocolError(message.error));
             return;
           }
 
           const request = takePending(pending, message.id);
-
-          if (!request) {
-            return;
-          }
-
-          request.resolve(message.result.data.json);
+          request?.resolve(message.payload);
         });
 
         ws.addEventListener("close", () => {
@@ -159,25 +145,20 @@ export function createClient<TApi extends ApiContract = ApiContract>(
       !reconnect.enabled ||
       !subscriptions.hasSubscriptions ||
       reconnectTimer
-    )
+    ) {
       return;
+    }
     reconnectTimer = setTimeout(() => {
       reconnectTimer = undefined;
       void open().catch(() => scheduleReconnect());
     }, reconnect.initialDelayMs);
   }
 
-  const sendRequest = <TResult>(ws: WebSocket, request: ClientRpcRequest): Promise<TResult> => {
+  const sendRequest = <TResult>(ws: WebSocket, request: ClientMessage): Promise<TResult> => {
     return new Promise((resolve, reject) => {
       const id = request.id;
-      if (id === null || id === undefined) {
-        reject(new Error("RPC request requires an id"));
-        return;
-      }
-
       const timeout = setTimeout(() => {
-        const request = takePending(pending, id);
-        request?.reject(new RequestTimeoutError());
+        takePending(pending, id)?.reject(new RequestTimeoutError());
       }, requestTimeoutMs);
       pending.set(String(id), {
         resolve: (value) => {
@@ -191,10 +172,9 @@ export function createClient<TApi extends ApiContract = ApiContract>(
       });
 
       try {
-        sendClientRpcRequest(ws, request);
+        sendClientMessage(ws, request);
       } catch (error) {
-        const pendingRequest = takePending(pending, id);
-        pendingRequest?.reject(error instanceof Error ? error : new Error(String(error)));
+        takePending(pending, id)?.reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   };
@@ -203,20 +183,13 @@ export function createClient<TApi extends ApiContract = ApiContract>(
     ws: WebSocket,
     method: "subscribe" | "unsubscribe",
     collection: string,
-  ): Promise<SubscriptionControlResult> => {
-    const id = String(nextId++);
-    return sendRequest<SubscriptionControlResult>(ws, {
-      id,
-      method,
-      params: {
-        input: {
-          json: {
-            collection,
-          },
-        },
-      },
+  ): Promise<SubscriptionControlResult> =>
+    sendRequest<SubscriptionControlResult>(ws, {
+      version: 1,
+      id: String(nextId++),
+      type: method,
+      input: { collection },
     });
-  };
 
   subscriptions = new ClientSubscriptions({
     currentSocket: () => socket,
@@ -224,45 +197,15 @@ export function createClient<TApi extends ApiContract = ApiContract>(
     send: sendSubscriptionControl,
   });
 
-  const link: TRPCLink<Router> = () => {
-    return ({ op }) =>
-      observable((observer) => {
-        let cancelled = false;
-
-        open()
-          .then((ws) => {
-            if (cancelled) return;
-
-            const id = String(nextId++);
-            sendRequest(ws, requestForOperation(id, op))
-              .then((value) => {
-                observer.next({ result: { data: value } });
-                observer.complete();
-              })
-              .catch((error) => observer.error(error as never));
-          })
-          .catch((error) => observer.error(error as never));
-
-        return () => {
-          cancelled = true;
-        };
-      });
-  };
-
-  const trpc = createTRPCProxyClient<Router>({ links: [link] }) as unknown as {
-    push: {
-      mutate: (batch: Batch) => Promise<PushResult>;
-    };
-    read: {
-      query: <T = unknown>(query: ReadQuery) => Promise<ReadResult<T>>;
-    };
-    changes: {
-      query: (query: SyncChangesQuery) => Promise<SyncChangesResult>;
-    };
-    api: {
-      mutate: <TResult = unknown>(call: ApiCall) => Promise<TResult>;
-    };
-  };
+  const sendPush = (batch: Batch): Promise<PushResult> =>
+    open().then((ws) =>
+      sendRequest<PushResult>(ws, {
+        version: 1,
+        id: String(nextId++),
+        type: "push",
+        input: batch,
+      }),
+    );
 
   return {
     clientId,
@@ -270,19 +213,41 @@ export function createClient<TApi extends ApiContract = ApiContract>(
       const attempts = reconnect.enabled ? reconnect.maxAttempts : 1;
       for (let attempt = 0; ; attempt += 1) {
         try {
-          return await trpc.push.mutate(batch);
+          return await sendPush(batch);
         } catch (error) {
           if (!retryableMutationError(error) || attempt + 1 >= attempts) throw error;
           await wait(reconnectDelay(reconnect, attempt));
         }
       }
     },
-    read: (query) => trpc.read.query(query),
-    changes: (query) => trpc.changes.query(query),
-    call: <TPath extends ApiPath<TApi>>(path: TPath, ...args: ApiCallArgs<TApi, TPath>) => {
+    read: async <T = unknown>(query: ReadQuery) => {
+      const ws = await open();
+      return sendRequest<ReadResult<T>>(ws, {
+        version: 1,
+        id: String(nextId++),
+        type: "read",
+        input: query,
+      });
+    },
+    changes: async (query: SyncChangesQuery) => {
+      const ws = await open();
+      return sendRequest<SyncChangesResult>(ws, {
+        version: 1,
+        id: String(nextId++),
+        type: "changes",
+        input: query,
+      });
+    },
+    call: async <TPath extends ApiPath<TApi>>(path: TPath, ...args: ApiCallArgs<TApi, TPath>) => {
       const [input] = args;
-      const call = input === undefined ? { path } : { path, input };
-      return trpc.api.mutate<ApiOutput<TApi, TPath>>(call);
+      const call: ApiCall = input === undefined ? { path } : { path, input };
+      const ws = await open();
+      return sendRequest<ApiOutput<TApi, TPath>>(ws, {
+        version: 1,
+        id: String(nextId++),
+        type: "api",
+        input: call,
+      });
     },
     subscribe: (collection, listener) => subscriptions.subscribe(collection, listener),
     close() {

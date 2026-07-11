@@ -1,155 +1,133 @@
 import { describe, expect, it } from "vite-plus/test";
 import { webSocketAttachmentSchema } from "../src/api";
 import {
-  encodeClientRpcRequest,
+  encodeClientMessage,
   encodeServerMessage,
-  parseClientRpcRequest,
+  parseClientMessage,
   parseServerMessage,
-  readRpcId,
+  readMessageId,
 } from "../src/rpc";
 
-describe("parseClientRpcRequest", () => {
-  it("accepts custom API calls", () => {
-    const request = parseClientRpcRequest(
-      encodeClientRpcRequest({
+describe("protocol messages", () => {
+  it("round trips a custom API call without a nested input envelope", () => {
+    const request = parseClientMessage(
+      encodeClientMessage({
+        version: 1,
         id: "1",
-        method: "mutation",
-        params: {
-          path: "api",
-          input: {
-            json: {
-              path: "completeAll",
-              input: { collection: "todos" },
-            },
-          },
+        type: "api",
+        input: {
+          path: "completeAll",
+          input: { collection: "todos" },
         },
       }),
     );
 
     expect(request).toEqual({
+      version: 1,
       id: "1",
-      method: "mutation",
-      params: {
-        path: "api",
-        input: {
-          json: {
-            path: "completeAll",
-            input: { collection: "todos" },
-          },
-        },
+      type: "api",
+      input: {
+        path: "completeAll",
+        input: { collection: "todos" },
       },
     });
   });
 
-  it("accepts custom API calls without input", () => {
-    const request = parseClientRpcRequest(
-      encodeClientRpcRequest({
-        id: "1",
-        method: "mutation",
-        params: {
-          path: "api",
-          input: {
-            json: {
-              path: "todos.health",
-            },
-          },
-        },
-      }),
-    );
-
-    expect(request).toEqual({
-      id: "1",
-      method: "mutation",
-      params: {
-        path: "api",
-        input: {
-          json: {
-            path: "todos.health",
-          },
-        },
-      },
-    });
-  });
-
-  it("accepts collection subscription controls", () => {
+  it("accepts API calls without input", () => {
     expect(
-      parseClientRpcRequest(
-        encodeClientRpcRequest({
+      parseClientMessage(
+        encodeClientMessage({
+          version: 1,
+          id: "1",
+          type: "api",
+          input: { path: "todos.health" },
+        }),
+      ),
+    ).toEqual({
+      version: 1,
+      id: "1",
+      type: "api",
+      input: { path: "todos.health" },
+    });
+  });
+
+  it("round trips subscription controls", () => {
+    expect(
+      parseClientMessage(
+        encodeClientMessage({
+          version: 1,
           id: "2",
-          method: "subscribe",
-          params: {
-            input: {
-              json: {
-                collection: "/projects/p1/issues/",
-              },
-            },
-          },
+          type: "subscribe",
+          input: { collection: "/projects/p1/issues/" },
         }),
       ),
     ).toEqual({
+      version: 1,
       id: "2",
-      method: "subscribe",
-      params: {
-        input: {
-          json: {
-            collection: "/projects/p1/issues/",
-          },
-        },
-      },
-    });
-
-    expect(
-      parseClientRpcRequest(
-        encodeClientRpcRequest({
-          id: "3",
-          method: "unsubscribe",
-          params: {
-            input: {
-              json: {
-                collection: "/projects/p1/issues/",
-              },
-            },
-          },
-        }),
-      ),
-    ).toEqual({
-      id: "3",
-      method: "unsubscribe",
-      params: {
-        input: {
-          json: {
-            collection: "/projects/p1/issues/",
-          },
-        },
-      },
+      type: "subscribe",
+      input: { collection: "/projects/p1/issues/" },
     });
   });
 
-  it("round trips server messages as messagepack bytes", () => {
-    const bytes = encodeServerMessage({
+  it("round trips results, updates, and structured errors", () => {
+    expect(
+      parseServerMessage(
+        encodeServerMessage({
+          version: 1,
+          id: "4",
+          type: "result",
+          payload: { accepted: 1 },
+        }),
+      ),
+    ).toEqual({
+      version: 1,
       id: "4",
-      result: {
-        type: "data",
-        data: {
-          json: { accepted: 1 },
-        },
-      },
+      type: "result",
+      payload: { accepted: 1 },
     });
 
-    expect(bytes).toBeInstanceOf(ArrayBuffer);
-    expect(parseServerMessage(bytes)).toEqual({
-      id: "4",
-      result: {
-        type: "data",
-        data: {
-          json: { accepted: 1 },
-        },
+    expect(
+      parseServerMessage(
+        encodeServerMessage({
+          version: 1,
+          type: "updates",
+          payload: {
+            type: "updates",
+            shardId: "shard-1",
+            updates: [],
+            watermark: 2,
+          },
+        }),
+      ),
+    ).toMatchObject({ version: 1, type: "updates" });
+
+    expect(
+      parseServerMessage(
+        encodeServerMessage({
+          version: 1,
+          id: "5",
+          type: "error",
+          error: {
+            code: "AUTH_DENIED",
+            message: "Access denied",
+            details: { collection: "todos" },
+          },
+        }),
+      ),
+    ).toEqual({
+      version: 1,
+      id: "5",
+      type: "error",
+      error: {
+        code: "AUTH_DENIED",
+        message: "Access denied",
+        details: { collection: "todos" },
       },
     });
   });
 
   it("returns null when reading an id from a malformed frame", () => {
-    expect(readRpcId("not messagepack")).toBeNull();
+    expect(readMessageId("not messagepack")).toBeNull();
   });
 });
 

@@ -7,5 +7,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],
-  "references": [{ "path": "../../packages/tanstack-db" }]
+  "references": [{ "path": "../../packages/tanstack-db" }, { "path": "../../packages/transport" }]
 }

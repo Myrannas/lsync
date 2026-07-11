@@ -1,8 +1,6 @@
-import { initTRPC } from "@trpc/server";
 import {
   apiCallSchema,
   batchSchema,
-  collectionSubscriptionResultSchema,
   collectionSubscriptionSchema,
   readQuerySchema,
   syncChangesQuerySchema,
@@ -17,6 +15,7 @@ import {
   type SyncChangesQuery,
   type SyncChangesResult,
 } from "./types";
+import type { z } from "zod";
 
 export interface Context {
   shardId: string;
@@ -31,52 +30,51 @@ export interface Context {
   callApi: (call: ApiCall) => unknown;
 }
 
-const t = initTRPC.context<Context>().create();
+export interface Caller {
+  push(input: Batch): Promise<PushResult>;
+  read(input: unknown): Promise<ReadResult>;
+  subscribe(input: CollectionSubscription): Promise<CollectionSubscriptionResult>;
+  unsubscribe(input: CollectionSubscription): Promise<CollectionSubscriptionResult>;
+  changes(input: SyncChangesQuery): Promise<SyncChangesResult>;
+  api(input: ApiCall): Promise<unknown>;
+}
 
-export const router = t.router({
-  push: t.procedure.input(batchSchema).mutation(({ ctx, input }): PushResult => {
-    return ctx.mutate(input);
-  }),
-  read: t.procedure.input(readQuerySchema).query(({ ctx, input }): ReadResult => {
-    return ctx.read(normalizeReadQuery(input));
-  }),
-  subscribe: t.procedure
-    .input(collectionSubscriptionSchema)
-    .output(collectionSubscriptionResultSchema)
-    .mutation(({ ctx, input }) => {
-      return ctx.subscribe(input);
-    }),
-  unsubscribe: t.procedure
-    .input(collectionSubscriptionSchema)
-    .output(collectionSubscriptionResultSchema)
-    .mutation(({ ctx, input }) => {
-      return ctx.unsubscribe(input);
-    }),
-  changes: t.procedure.input(syncChangesQuerySchema).query(({ ctx, input }): SyncChangesResult => {
-    return ctx.changes(input);
-  }),
-  api: t.procedure.input(apiCallSchema).mutation(({ ctx, input }): unknown => {
-    return ctx.callApi(input);
-  }),
-});
+export interface Router {
+  createCaller(context: Context): Caller;
+}
 
-export type Router = typeof router;
+export const router: Router = {
+  createCaller(context): Caller {
+    return {
+      async push(input) {
+        return context.mutate(batchSchema.parse(input));
+      },
+      async read(input) {
+        return context.read(normalizeReadQuery(readQuerySchema.parse(input)));
+      },
+      async subscribe(input) {
+        return context.subscribe(collectionSubscriptionSchema.parse(input));
+      },
+      async unsubscribe(input) {
+        return context.unsubscribe(collectionSubscriptionSchema.parse(input));
+      },
+      async changes(input) {
+        return context.changes(syncChangesQuerySchema.parse(input));
+      },
+      async api(input) {
+        return context.callApi(apiCallSchema.parse(input));
+      },
+    };
+  },
+};
 
-function normalizeReadQuery(input: {
-  collection: string;
-  filters?: ReadQuery["filters"] | undefined;
-  predicate?: ReadQuery["predicate"] | undefined;
-  orderBy?: ReadQuery["orderBy"] | undefined;
-  cursor?: ReadQuery["cursor"] | undefined;
-  limit?: number | undefined;
-  offset?: number | undefined;
-}): ReadQuery {
+function normalizeReadQuery(input: z.output<typeof readQuerySchema>): ReadQuery {
   return {
     collection: input.collection,
-    ...(input.filters ? { filters: input.filters } : {}),
-    ...(input.predicate ? { predicate: input.predicate } : {}),
-    ...(input.orderBy ? { orderBy: input.orderBy } : {}),
-    ...(input.cursor ? { cursor: input.cursor } : {}),
+    ...(input.filters !== undefined ? { filters: input.filters } : {}),
+    ...(input.predicate !== undefined ? { predicate: input.predicate } : {}),
+    ...(input.orderBy !== undefined ? { orderBy: input.orderBy } : {}),
+    ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
     ...(input.limit !== undefined ? { limit: input.limit } : {}),
     ...(input.offset !== undefined ? { offset: input.offset } : {}),
   };

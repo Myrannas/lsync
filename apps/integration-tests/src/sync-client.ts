@@ -1,23 +1,13 @@
-import { decode, encode } from "@msgpack/msgpack";
+import {
+  encodeClientMessage,
+  parseServerMessage,
+  ProtocolError,
+  type ApiCall,
+  type Batch,
+  type ClientMessage,
+  type ReadQuery,
+} from "@lsync/transport";
 
-interface RpcSuccess<T> {
-  id: string;
-  result: {
-    type: "data";
-    data: {
-      json: T;
-    };
-  };
-}
-
-interface RpcFailure {
-  id: string;
-  error: {
-    message: string;
-  };
-}
-
-type RpcResponse<T> = RpcSuccess<T> | RpcFailure;
 type BinaryMessage = ArrayBuffer | ArrayBufferView | Blob | string;
 const todosCollection = "/todos/";
 const requestTimeoutMs = 5_000;
@@ -92,7 +82,6 @@ function callApi<T>(ws: WebSocket, path: string, input?: unknown): Promise<T> {
 
 function request<T>(ws: WebSocket, path: "api" | "push" | "read", input: unknown): Promise<T> {
   const id = crypto.randomUUID();
-  const method = path === "read" ? "query" : "mutation";
 
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -100,67 +89,34 @@ function request<T>(ws: WebSocket, path: "api" | "push" | "read", input: unknown
       reject(new Error(`Timed out waiting for ${path} response`));
     }, requestTimeoutMs);
     const onMessage = async (event: MessageEvent) => {
-      const response = decodeMessage<T>(await messageData(event.data));
-      if (response.id !== id) return;
+      const response = parseServerMessage(await messageData(event.data));
+      if (response.type === "updates" || response.id !== id) return;
 
       clearTimeout(timeout);
       ws.removeEventListener("message", onMessage);
-      if ("error" in response) {
-        reject(new Error(response.error.message));
+      if (response.type === "error") {
+        reject(new ProtocolError(response.error));
         return;
       }
 
-      resolve(response.result.data.json);
+      resolve(response.payload as T);
     };
 
     ws.addEventListener("message", onMessage);
-    ws.send(encodeMessage(requestMessage(id, method, path, input)));
+    ws.send(encodeClientMessage(requestMessage(id, path, input)));
   });
 }
 
-function requestMessage(
-  id: string,
-  method: "mutation" | "query",
-  path: "api" | "push" | "read",
-  input: unknown,
-): unknown {
-  if (path === "read") {
-    return {
-      id,
-      method: "query",
-      params: {
-        path: "read",
-        input: {
-          json: input,
-        },
-      },
-    };
+function requestMessage(id: string, path: "api" | "push" | "read", input: unknown): ClientMessage {
+  if (path === "api") {
+    return { version: 1, id, type: "api", input: input as ApiCall };
   }
-
-  return {
-    id,
-    method,
-    params: {
-      path,
-      input: {
-        json: input,
-      },
-    },
-  };
+  if (path === "push") {
+    return { version: 1, id, type: "push", input: input as Batch };
+  }
+  return { version: 1, id, type: "read", input: input as ReadQuery };
 }
 
 async function messageData(data: BinaryMessage): Promise<ArrayBuffer | ArrayBufferView | string> {
   return data instanceof Blob ? data.arrayBuffer() : data;
-}
-
-function decodeMessage<T>(data: ArrayBuffer | ArrayBufferView | string): RpcResponse<T> {
-  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
-  return decode(bytes) as RpcResponse<T>;
-}
-
-function encodeMessage(message: unknown): ArrayBuffer {
-  const bytes = encode(message);
-  const buffer = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(buffer).set(bytes);
-  return buffer;
 }

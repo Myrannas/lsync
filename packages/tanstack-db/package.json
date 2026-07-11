@@ -34,9 +34,7 @@
     "@lsync/definitions": "workspace:*",
     "@lsync/transport": "workspace:*",
     "@standard-schema/spec": "catalog:",
-    "@tanstack/db": "catalog:",
-    "@trpc/client": "catalog:",
-    "@trpc/server": "catalog:"
+    "@tanstack/db": "catalog:"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",
