@@ -7,6 +7,7 @@
 export { createBatch, toChangeMessage } from "./batch";
 export { createClient } from "./client";
 export { collectionOptions } from "./collection";
+export { DEFAULT_MAX_SYNC_ROWS } from "./initial-sync";
 export { collectionTypesFrom } from "./definition-builder";
 export type {
   ChildCollectionTypeOptions,

@@ -33,6 +33,11 @@ export {
 } from "@lsync/transport";
 export { createWorkerHandler } from "./worker";
 export {
+  cloudflareRateLimiter,
+  DEFAULT_MAX_SUBSCRIPTIONS_PER_WEBSOCKET,
+  type CloudflareRateLimiterOptions,
+} from "./safeguards";
+export {
   collectionApiHandlers,
   collectionScope,
   defaultCollectionApiPath,
@@ -119,5 +124,11 @@ export type {
   Update,
   WebSocketAttachment,
 } from "./types";
-export type { CollectionShardOptions, Env } from "./durable-object-types";
+export type {
+  CollectionShardLimits,
+  CollectionShardOptions,
+  Env,
+  RateLimitContext,
+  RateLimitHandler,
+} from "./durable-object-types";
 export type { WorkerOptions } from "./worker";

@@ -140,4 +140,56 @@ describe("CollectionShardDurableObject subscriptions", () => {
       },
     });
   });
+
+  it("limits subscriptions per WebSocket by default and supports overrides", async () => {
+    const limited = setup(undefined, {
+      limits: { maxSubscriptionsPerWebSocket: 1 },
+    });
+
+    await limited.object.webSocketMessage(
+      limited.socket as never,
+      rpc("1", "subscribe", { collection: "todos" }),
+    );
+    await limited.object.webSocketMessage(
+      limited.socket as never,
+      rpc("2", "subscribe", { collection: "projects" }),
+    );
+
+    expect(limited.socket.messages.map(parseMessage)).toContainEqual({
+      id: "2",
+      error: {
+        message: "Maximum subscriptions per WebSocket exceeded (1)",
+      },
+    });
+
+    const unlimited = setup(undefined, {
+      limits: { maxSubscriptionsPerWebSocket: false },
+    });
+    await unlimited.object.webSocketMessage(
+      unlimited.socket as never,
+      rpc("1", "subscribe", { collection: "todos" }),
+    );
+    await unlimited.object.webSocketMessage(
+      unlimited.socket as never,
+      rpc("2", "subscribe", { collection: "projects" }),
+    );
+    expect(unlimited.socket.deserializeAttachment().subscriptions).toEqual([
+      "/todos/",
+      "/projects/",
+    ]);
+  });
+
+  it("rejects messages denied by the configured rate limiter", async () => {
+    const { object, socket } = setup(undefined, {
+      rateLimit: async () => false,
+    });
+
+    await object.webSocketMessage(socket as never, rpc("1", "subscribe", { collection: "todos" }));
+
+    expect(socket.messages.map(parseMessage)).toContainEqual({
+      id: "1",
+      error: { message: "Rate limit exceeded" },
+    });
+    expect(socket.deserializeAttachment().subscriptions).toEqual([]);
+  });
 });

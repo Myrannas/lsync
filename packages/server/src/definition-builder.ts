@@ -8,7 +8,11 @@ import type {
 import { authorizeApiCall } from "./access";
 import { collectionBuilder } from "./collection-builder";
 import { defaultCollectionApiPath } from "./collections";
-import type { CollectionShardOptions } from "./durable-object-types";
+import type {
+  CollectionShardLimits,
+  CollectionShardOptions,
+  RateLimitHandler,
+} from "./durable-object-types";
 import { z } from "zod";
 import type {
   AccessReferenceResolver,
@@ -22,14 +26,29 @@ import type {
 export function collectionShardOptionsFrom<TCollections extends CollectionDefinitions>(
   definitions: CollectionSet<TCollections>,
 ): CollectionShardDefinitionBuilder<TCollections> {
-  return new CollectionShardDefinitionBuilder(definitions.collections, {});
+  return new CollectionShardDefinitionBuilder(definitions.collections, {}, {});
 }
 
 export class CollectionShardDefinitionBuilder<TCollections extends CollectionDefinitions> {
   constructor(
     private readonly definitions: TCollections,
     private readonly overrides: Record<string, ServerCollectionOverride>,
+    private readonly options: Omit<CollectionShardOptions, "collections">,
   ) {}
+
+  limits(limits: CollectionShardLimits): CollectionShardDefinitionBuilder<TCollections> {
+    return new CollectionShardDefinitionBuilder(this.definitions, this.overrides, {
+      ...this.options,
+      limits,
+    });
+  }
+
+  rateLimit(rateLimit: RateLimitHandler): CollectionShardDefinitionBuilder<TCollections> {
+    return new CollectionShardDefinitionBuilder(this.definitions, this.overrides, {
+      ...this.options,
+      rateLimit,
+    });
+  }
 
   collection<TPath extends CollectionPath<TCollections>>(
     path: TPath,
@@ -38,10 +57,14 @@ export class CollectionShardDefinitionBuilder<TCollections extends CollectionDef
     ) => ServerCollectionBuilder<CollectionAtPath<TCollections, TPath>>,
   ): CollectionShardDefinitionBuilder<TCollections> {
     const override = configure(new ServerCollectionBuilder({})).toOverride();
-    return new CollectionShardDefinitionBuilder(this.definitions, {
-      ...this.overrides,
-      [path]: override,
-    });
+    return new CollectionShardDefinitionBuilder(
+      this.definitions,
+      {
+        ...this.overrides,
+        [path]: override,
+      },
+      this.options,
+    );
   }
 
   build(): CollectionShardOptions {
@@ -51,7 +74,7 @@ export class CollectionShardDefinitionBuilder<TCollections extends CollectionDef
       addDefinition(collections, definition, name, this.overrides);
     }
 
-    return { collections };
+    return { ...this.options, collections };
   }
 }
 

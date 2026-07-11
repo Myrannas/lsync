@@ -99,6 +99,7 @@ export type CollectionOptions<
   getKey: (item: T) => TKey;
   schema?: TSchema;
   ignoreOwnUpdates?: boolean;
+  maxSyncRows?: number | false;
   read?: false | Omit<ReadQuery, "collection">;
 } & CollectionConnectionOptions;
 

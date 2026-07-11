@@ -14,6 +14,7 @@ import { persistSQLiteJsonBatchWithHistory, readSQLiteJsonChanges } from "./hist
 import { sendRpcError, sendRpcResult } from "./messages";
 import { deduplicateMutations } from "./mutation-dedup";
 import { router } from "./router";
+import { assertSubscriptionAllowed, enforceRateLimit } from "./safeguards";
 import { updateSocketSubscriptions, webSocketAttachment, webSocketAuth } from "./socket-attachment";
 import { readSQLiteJsonRow, readSQLiteJsonRows } from "./storage";
 import { subscribedInvalidations } from "./subscription-invalidation";
@@ -77,6 +78,7 @@ export class CollectionShardDurableObject implements DurableObject {
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
     try {
+      await enforceRateLimit(ws, this.env, this.options.rateLimit);
       const request = parseClientRpcRequest(message);
 
       const caller = router.createCaller({
@@ -176,6 +178,11 @@ export class CollectionShardDurableObject implements DurableObject {
   }
 
   private subscribe(ws: WebSocket, input: CollectionSubscription): CollectionSubscriptionResult {
+    assertSubscriptionAllowed(
+      ws,
+      normalizeCollection(input.collection, this.options.collections),
+      this.options.limits,
+    );
     return this.updateSubscriptions(ws, input.collection, (subscriptions, collection) => {
       subscriptions.add(collection);
     });

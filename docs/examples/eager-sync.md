@@ -38,4 +38,6 @@ export function SettingsPanel() {
 ```
 
 Use eager sync deliberately for low-cardinality collections such as user settings and reference
-tables.
+tables. Eager sync is capped at 10,000 rows by default; see
+[Limits And Rate Limiting](/examples/limits-and-rate-limiting) to choose a different cap or move a
+growing collection to on-demand sync.

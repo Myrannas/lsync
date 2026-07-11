@@ -28,6 +28,17 @@ const definitions = defineCollections()
   .build();
 
 describe("CollectionShard.from", () => {
+  it("builds shard-level safeguards", () => {
+    const rateLimit = async () => true;
+    const options = CollectionShardDurableObject.from(definitions)
+      .limits({ maxSubscriptionsPerWebSocket: 25 })
+      .rateLimit(rateLimit)
+      .build();
+
+    expect(options.limits).toEqual({ maxSubscriptionsPerWebSocket: 25 });
+    expect(options.rateLimit).toBe(rateLimit);
+  });
+
   it("builds server collection configs with implied SQLite JSON indexes", () => {
     const options = CollectionShardDurableObject.from(definitions)
       .collection("todos", (todos) => todos.index("completed").index("userId"))
