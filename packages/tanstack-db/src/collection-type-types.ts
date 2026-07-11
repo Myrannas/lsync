@@ -84,6 +84,8 @@ export type CollectionType<
   TApi extends CollectionTypeApi<T, TKey> = {},
 > = {
   all(params?: CollectionScopeParams): Collection<T, TKey>;
+  /** Clean up and remove every scoped collection created by this collection type. */
+  dispose(): Promise<void>;
   with(params: CollectionScopeParams): CollectionType<T, TKey, TChildren, TApi>;
   withId(id: TKey, childParam?: string): CollectionEntity<T, TKey, TChildren>;
   usage(): Array<CollectionUsage>;
@@ -114,6 +116,8 @@ export type CollectionTypeBaseOptions<
   children?: TChildren;
   api?: TApi;
   parentParam?: string;
+  /** Maximum number of inactive scoped collections to retain. Defaults to 32. */
+  maxCachedCollections?: number;
 };
 
 export type CollectionTypeOptions<
@@ -154,5 +158,3 @@ export interface CollectionCacheEntry<T extends object, TKey extends string | nu
   collection: Collection<T, TKey>;
   usage: CollectionUsage;
 }
-
-export type CollectionCache = Map<string, CollectionCacheEntry<any, any>>;
