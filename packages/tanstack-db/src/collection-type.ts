@@ -208,7 +208,7 @@ class CollectionTypeManager<
     try {
       return await client.call(path, input);
     } finally {
-      lease?.release();
+      lease?.[Symbol.dispose]();
     }
   }
 

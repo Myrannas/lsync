@@ -52,6 +52,7 @@ export {
 export {
   persistSQLiteJsonBatchWithHistory,
   readSQLiteJsonChanges,
+  SQLITE_JSON_CONFLICT_POLICY,
   type HistoryOptions,
   type SequencedBatch,
 } from "./history";

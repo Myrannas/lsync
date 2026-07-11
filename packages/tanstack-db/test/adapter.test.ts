@@ -137,7 +137,7 @@ describe("acquireSharedClient", () => {
     expect(first.client).toBe(second.client);
     expect(first.client.clientId).toBe(second.client.clientId);
 
-    first.release();
+    first[Symbol.dispose]();
     second.release();
   });
 

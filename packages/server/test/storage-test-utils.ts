@@ -48,6 +48,7 @@ export class FakeSql implements SqlStorageLike {
     server_created_at: string;
   }> = [];
   collectionWatermarks = new Map<string, { collection: string; latest_sequence: number }>();
+  appliedUpdates = new Map<string, { payload: string; sequence: number }>();
 
   exec<T extends Record<string, SqlStorageValue>>(
     query: string,
@@ -61,6 +62,19 @@ export class FakeSql implements SqlStorageLike {
       normalized.startsWith("CREATE TABLE IF NOT EXISTS") ||
       normalized.startsWith("CREATE INDEX IF NOT EXISTS")
     ) {
+      return new FakeCursor<T>();
+    }
+
+    if (normalized.startsWith('SELECT payload FROM "_lsync_applied_updates"')) {
+      const row = this.appliedUpdates.get(String(bindings[0]));
+      return new FakeCursor(row ? ([row] as unknown as Array<T>) : []);
+    }
+
+    if (normalized.startsWith('INSERT INTO "_lsync_applied_updates"')) {
+      this.appliedUpdates.set(String(bindings[0]), {
+        payload: String(bindings[1]),
+        sequence: Number(bindings[2]),
+      });
       return new FakeCursor<T>();
     }
 
@@ -134,7 +148,7 @@ export class FakeSql implements SqlStorageLike {
       return new FakeCursor<T>();
     }
 
-    if (normalized.startsWith('SELECT sequence, update_id, collection, "key"')) {
+    if (normalized.startsWith('SELECT sequence, update_id, collection, scope, "key"')) {
       const limit = Number(bindings.at(-1));
       const requested = new Map<string, number>();
       for (let index = 0; index < bindings.length - 1; index += 2) {
