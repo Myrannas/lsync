@@ -84,6 +84,10 @@ export class ClientCollectionBuilder<TDefinition> {
     return new ClientCollectionBuilder({ ...this.override, syncMode });
   }
 
+  maxSyncRows(maxSyncRows: number | false): ClientCollectionBuilder<TDefinition> {
+    return new ClientCollectionBuilder({ ...this.override, maxSyncRows });
+  }
+
   index(
     autoIndex: BuilderIndexMode,
     defaultIndexType?: BuilderIndexType,
@@ -141,6 +145,7 @@ type ApiMethodsForDefinitions<
 
 interface ClientCollectionOverride {
   syncMode?: BuilderSyncMode;
+  maxSyncRows?: number | false;
   autoIndex?: BuilderIndexMode;
   defaultIndexType?: BuilderIndexType;
 }

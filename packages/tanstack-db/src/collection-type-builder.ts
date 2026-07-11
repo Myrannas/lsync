@@ -95,6 +95,12 @@ export class CollectionTypeBuilder<
     return this.next({ syncMode });
   }
 
+  maxSyncRows(
+    maxSyncRows: number | false,
+  ): CollectionTypeBuilder<T, TKey, TSchema, TChildren, TApi> {
+    return this.next({ maxSyncRows });
+  }
+
   index(
     autoIndex: BuilderIndexMode,
     defaultIndexType?: BuilderIndexType,

@@ -39,6 +39,7 @@ export default defineConfig({
           { text: "Offline Support", link: "/examples/offline-support" },
           { text: "Document APIs", link: "/examples/document-apis" },
           { text: "Permissions", link: "/examples/permissions" },
+          { text: "Limits And Rate Limiting", link: "/examples/limits-and-rate-limiting" },
         ],
       },
     ],

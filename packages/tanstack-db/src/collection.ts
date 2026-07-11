@@ -9,6 +9,7 @@ import { createBatch } from "./batch";
 import { acquireSharedClient } from "./client";
 import { applyCollectionBroadcast } from "./collection-broadcast";
 import { initialReadQuery, readQueryForSubset, subsetId } from "./read-query";
+import { readInitialSyncRows } from "./initial-sync";
 import { SyncSession } from "./sync-session";
 import type { CollectionOptions, ReadQuery } from "./types";
 import { SubsetTracker, writeRows } from "./subsets";
@@ -111,10 +112,10 @@ export function collectionOptions<
         const loadEager = async (replace = false) => {
           if (replace) truncate();
           if (!initialQuery) return;
-          const result = await client.read<T>(initialQuery);
-          if (result.rows.length === 0) return;
+          const rows = await readInitialSyncRows<T>(client, initialQuery, options.maxSyncRows);
+          if (rows.length === 0) return;
           begin();
-          writeRows(collection, result.rows, options.getKey, write);
+          writeRows(collection, rows, options.getKey, write);
           commit();
         };
         const reloadSubsets = async () => {

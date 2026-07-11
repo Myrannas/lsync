@@ -137,7 +137,7 @@ function selectRows(
 
   const order =
     options.orderBy.length > 0
-      ? join(options.orderBy.map((item) => orderBySql(item)))
+      ? sqlTag`${join(options.orderBy.map((item) => orderBySql(item)))}, key`
       : sqlTag`key`;
 
   return execSql<{ key: string; value: string }>(
