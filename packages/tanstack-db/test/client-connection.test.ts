@@ -1,4 +1,4 @@
-import { encodeServerMessage, parseClientRpcRequest } from "@lsync/transport";
+import { encodeServerMessage, parseClientMessage } from "@lsync/transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createClient } from "../src/client";
 import { rejectPending, type PendingRequest } from "../src/client-rpc";
@@ -117,37 +117,38 @@ describe("client connection lifecycle", () => {
     const first = FakeWebSocket.instances[0]!;
     first.open();
     await eventually(() => first.sent.length === 1);
-    const firstRequest = parseClientRpcRequest(first.sent[0]!);
+    const firstRequest = parseClientMessage(first.sent[0]!);
     first.close();
 
     await vi.advanceTimersByTimeAsync(5);
     const second = FakeWebSocket.instances[1]!;
     second.open();
     await eventually(() => second.sent.length === 1);
-    const secondRequest = parseClientRpcRequest(second.sent[0]!);
+    const secondRequest = parseClientMessage(second.sent[0]!);
     second.message(
       encodeServerMessage({
+        version: 1,
         id: secondRequest.id,
-        result: { type: "data", data: { json: { accepted: 1, watermark: 1 } } },
+        type: "result",
+        payload: { accepted: 1, watermark: 1 },
       }),
     );
 
     await expect(pushed).resolves.toEqual({ accepted: 1, watermark: 1 });
-    expect(firstRequest.params.input.json).toEqual(secondRequest.params.input.json);
+    expect(firstRequest.input).toEqual(secondRequest.input);
     client.close();
   });
 });
 
 async function replyToSubscription(socket: FakeWebSocket): Promise<void> {
   await eventually(() => socket.sent.length > 0);
-  const request = parseClientRpcRequest(socket.sent.at(-1)!);
+  const request = parseClientMessage(socket.sent.at(-1)!);
   socket.message(
     encodeServerMessage({
+      version: 1,
       id: request.id,
-      result: {
-        type: "data",
-        data: { json: { collection: "/todos/", subscriptions: ["/todos/"] } },
-      },
+      type: "result",
+      payload: { collection: "/todos/", subscriptions: ["/todos/"] },
     }),
   );
 }

@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@lsync/client": "workspace:*",
+    "@lsync/transport": "workspace:*",
     "@msgpack/msgpack": "catalog:",
     "@tanstack/db": "catalog:"
   },

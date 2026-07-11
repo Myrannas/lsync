@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 import {
-  encodeClientRpcRequest,
+  encodeClientMessage,
   parseServerMessage,
-  type ClientRpcRequest,
   type ServerMessage,
 } from "../../transport/src/rpc";
 import { CollectionShardDurableObject, type CollectionShardOptions } from "../src/durable-object";
@@ -39,15 +38,12 @@ describe("CollectionShardDurableObject collection APIs", () => {
 
     expect(socket.messages.map(parseMessage)).toContainEqual({
       id: "1",
-      result: {
-        type: "data",
-        data: {
-          json: {
-            shardId: "shard-1",
-            clientId: "client",
-            ok: true,
-          },
-        },
+      version: 1,
+      type: "result",
+      payload: {
+        shardId: "shard-1",
+        clientId: "client",
+        ok: true,
       },
     });
   });
@@ -72,7 +68,9 @@ describe("CollectionShardDurableObject collection APIs", () => {
     expect(socket.messages.map(parseMessage)).toEqual([
       expect.objectContaining({
         id: "1",
+        type: "error",
         error: expect.objectContaining({
+          code: "VALIDATION_FAILED",
           message: expect.any(String),
         }),
       }),
@@ -118,16 +116,12 @@ class FakeSocket {
 }
 
 function apiRpc(id: string, path: string, input?: unknown): ArrayBuffer {
-  return encodeClientRpcRequest({
+  return encodeClientMessage({
+    version: 1,
     id,
-    method: "mutation",
-    params: {
-      path: "api",
-      input: {
-        json: input === undefined ? { path } : { path, input },
-      },
-    },
-  } satisfies ClientRpcRequest);
+    type: "api",
+    input: input === undefined ? { path } : { path, input },
+  });
 }
 
 function parseMessage(message: ArrayBuffer): RpcResponse {

@@ -1,8 +1,7 @@
 import { z } from "zod";
 import {
-  encodeClientRpcRequest,
+  encodeClientMessage,
   parseServerMessage,
-  type ClientRpcRequest,
   type ServerMessage,
 } from "../../transport/src/rpc";
 import { and, eq, sqliteJsonTable } from "../src";
@@ -12,7 +11,7 @@ import type { SqlStorageCursorLike, SqlStorageValue } from "../src/storage";
 import { FakeSql } from "./storage-test-utils";
 
 type TestMessage = ServerMessage;
-type SubscriptionTestMessage = Extract<ServerMessage, { method: "subscription" }>;
+type SubscriptionTestMessage = Extract<ServerMessage, { type: "updates" }>;
 
 export function setup(
   sockets: Array<FakeSocket> = [fakeSocket("client")],
@@ -77,27 +76,20 @@ export function rpc(
   json: unknown,
 ): ArrayBuffer {
   if (path === "subscribe" || path === "unsubscribe") {
-    return encodeClientRpcRequest({
+    return encodeClientMessage({
+      version: 1,
       id,
-      method: path,
-      params: {
-        input: {
-          json: json as { collection: string },
-        },
-      },
-    } satisfies ClientRpcRequest);
+      type: path,
+      input: json as { collection: string },
+    });
   }
 
-  return encodeClientRpcRequest({
+  return encodeClientMessage({
+    version: 1,
     id,
-    method: "mutation",
-    params: {
-      path,
-      input: {
-        json: json as Batch,
-      },
-    },
-  } satisfies ClientRpcRequest);
+    type: "push",
+    input: json as Batch,
+  });
 }
 
 export function mixedBatch(): Batch {
@@ -225,7 +217,7 @@ export function projectOrgChange(): Batch {
 }
 
 export function subscriptionUpdates(socket: FakeSocket): Batch["updates"] {
-  return subscriptionMessages(socket).flatMap((message) => message.params.input.json.updates);
+  return subscriptionMessages(socket).flatMap((message) => message.payload.updates);
 }
 
 export function subscriptionKeys(socket: FakeSocket): Array<string | number> {
@@ -233,18 +225,13 @@ export function subscriptionKeys(socket: FakeSocket): Array<string | number> {
 }
 
 export function subscriptionInvalidations(socket: FakeSocket): Array<CollectionInvalidation> {
-  return subscriptionMessages(socket).flatMap(
-    (message) => message.params.input.json.invalidations ?? [],
-  );
+  return subscriptionMessages(socket).flatMap((message) => message.payload.invalidations ?? []);
 }
 
 export function subscriptionMessages(socket: FakeSocket): Array<SubscriptionTestMessage> {
   return socket.messages
     .map(parseMessage)
-    .filter(
-      (message): message is SubscriptionTestMessage =>
-        "method" in message && message.method === "subscription",
-    );
+    .filter((message): message is SubscriptionTestMessage => message.type === "updates");
 }
 
 export function parseMessage(message: ArrayBuffer): TestMessage {
