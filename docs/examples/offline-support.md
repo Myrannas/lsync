@@ -1,16 +1,60 @@
 # Offline Support
 
-`lsync` reconnects when the next operation needs the WebSocket, while TanStack DB applies local
-mutations optimistically. Durable queues and cross-reload persistence currently belong in the
-application layer.
+`lsync` can cache eager collection snapshots in IndexedDB. Cached rows hydrate TanStack DB before
+the WebSocket connects, so previously synchronized data is available immediately after a reload or
+while the device is offline.
 
-The usual pattern is:
+Enable it on a collection definition with `offline()`:
+
+```ts
+import { appCollections } from "./definition";
+import { collectionTypesFrom } from "@lsync/client";
+
+export const { todos } = collectionTypesFrom(appCollections)
+  .url("ws://localhost:8787/sync/demo")
+  .collection("todos", (todos) => todos.sync("eager").offline())
+  .build();
+```
+
+The generated collection ID is used as the stable IndexedDB cache key. For direct
+`collectionOptions` usage, provide an explicit `id`:
+
+```ts
+const options = collectionOptions({
+  id: "todos",
+  collection: "todos",
+  url: "ws://localhost:8787/sync/demo",
+  getKey: (todo: Todo) => todo.id,
+  offline: true,
+});
+```
+
+By default rows are stored in the `lsync` IndexedDB database. You can isolate an application and
+invalidate schema-incompatible cached data with:
+
+```ts
+.offline({ databaseName: "my-app", cacheVersion: 2 })
+```
+
+After local hydration, the server remains authoritative. A successful connection replaces the
+cached snapshot atomically; subsequent server broadcasts and accepted local mutations update the
+cache. A failed server push still rolls back and is not written to the cache.
+
+## Current Scope
+
+IndexedDB caching currently supports eager, readable collections. On-demand collections are
+rejected because their subset-completeness metadata is not yet durable. Persisting rows without
+that metadata could incorrectly claim that a partial subset is complete.
+
+This feature is a durable read cache, not a durable mutation queue. TanStack DB still applies local
+mutations optimistically, and a failed push rolls back as usual. If users need to write while
+offline, persist domain intents separately and replay idempotently:
 
 1. Give each browser profile a stable `clientId`.
 2. Persist pending user intents when offline or when a mutation fails.
 3. Replay idempotent intents when the browser returns online.
 
-## Stable Client Identity
+## Stable Client Identity for Intent Replay
 
 ```ts
 import { appCollections } from "./definition";

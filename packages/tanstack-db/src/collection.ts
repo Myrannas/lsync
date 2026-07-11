@@ -1,9 +1,4 @@
-import type {
-  CollectionConfig,
-  InferSchemaOutput,
-  LoadSubsetOptions,
-  TransactionWithMutations,
-} from "@tanstack/db";
+import type { CollectionConfig, InferSchemaOutput, LoadSubsetOptions } from "@tanstack/db";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { createBatch } from "./batch";
 import { acquireSharedClient } from "./client";
@@ -11,6 +6,9 @@ import { applyCollectionBroadcast } from "./collection-broadcast";
 import { initialReadQuery, readQueryForSubset, subsetId } from "./read-query";
 import { readInitialSyncRows } from "./initial-sync";
 import { SyncSession } from "./sync-session";
+import { createOfflineCache } from "./offline-cache";
+import { persistChanges, persistTransaction } from "./offline-sync";
+import { trackLocalTransaction } from "./local-transaction";
 import type { CollectionOptions, ReadQuery } from "./types";
 import { SubsetTracker, writeRows } from "./subsets";
 
@@ -41,6 +39,15 @@ export function collectionOptions<
   let lease: ReturnType<typeof acquireSharedClient> | undefined;
   let client = options.client;
   let activeSubsets: SubsetTracker<T, TKey> | undefined;
+
+  if (options.offline && options.syncMode === "on-demand") {
+    throw new Error("IndexedDB offline caching currently requires eager sync mode");
+  }
+  if (options.offline && options.read === false) {
+    throw new Error("IndexedDB offline caching requires an initial collection read");
+  }
+
+  const offline = createOfflineCache(options.offline, options.id, options.getKey);
 
   if (!client) {
     if (!options.url) {
@@ -80,6 +87,7 @@ export function collectionOptions<
             write({ type: "delete", key });
           }
           commit();
+          void offline?.delete(keys);
         };
         const cancelRetention = (id: string) => {
           const timer = retentionTimers.get(id);
@@ -110,13 +118,16 @@ export function collectionOptions<
         };
         const initialQuery = initialReadQuery(options.collection, options.read);
         const loadEager = async (replace = false) => {
-          if (replace) truncate();
           if (!initialQuery) return;
           const rows = await readInitialSyncRows<T>(client, initialQuery, options.maxSyncRows);
-          if (rows.length === 0) return;
-          begin();
-          writeRows(collection, rows, options.getKey, write);
-          commit();
+          if (replace) truncate();
+          if (rows.length > 0) {
+            begin();
+            writeRows(collection, rows, options.getKey, write);
+            commit();
+          }
+          if (replace) await offline?.replace(rows);
+          else await offline?.put(rows);
         };
         const reloadSubsets = async () => {
           for (const [id, query] of subsetQueries) {
@@ -131,16 +142,23 @@ export function collectionOptions<
             writeRows(collection, result.rows, options.getKey, write);
             for (const key of removedKeys) write({ type: "delete", key });
             commit();
+            await offline?.put(result.rows);
+            await offline?.delete(removedKeys);
           }
         };
         let markedReady = false;
+        const markCollectionReady = () => {
+          if (!markedReady) markReady();
+          markedReady = true;
+        };
         const session = new SyncSession({
           client,
           collection: options.collection,
-          initialize: () => (options.syncMode === "on-demand" ? Promise.resolve() : loadEager()),
+          initialize: () =>
+            options.syncMode === "on-demand" ? Promise.resolve() : loadEager(offline !== undefined),
           resync: () => (options.syncMode === "on-demand" ? reloadSubsets() : loadEager(true)),
-          apply: (broadcast) =>
-            applyCollectionBroadcast({
+          apply: (broadcast) => {
+            const changes = applyCollectionBroadcast({
               broadcast,
               collectionName: options.collection,
               clientId: client.clientId,
@@ -152,11 +170,22 @@ export function collectionOptions<
               write,
               commit,
               deleteKeys,
-            }),
-          synchronized: () => {
-            if (!markedReady) markReady();
-            markedReady = true;
+            });
+            persistChanges(offline, changes, collection, options.getKey);
           },
+          ...(offline
+            ? {
+                hydrate: async () => {
+                  const rows = await offline.load();
+                  if (rows.length === 0) return;
+                  begin();
+                  writeRows(collection, rows, options.getKey, write);
+                  commit();
+                },
+                hydrated: markCollectionReady,
+              }
+            : {}),
+          synchronized: markCollectionReady,
         });
         void session.start();
 
@@ -234,34 +263,27 @@ export function collectionOptions<
     },
     onInsert: async ({ transaction }) => {
       trackLocalTransaction(activeSubsets, options.syncMode, transaction);
-      return client.push(createBatch(options.collection, client.clientId, transaction));
+      const result = await client.push(
+        createBatch(options.collection, client.clientId, transaction),
+      );
+      persistTransaction(offline, transaction);
+      return result;
     },
     onUpdate: async ({ transaction }) => {
       trackLocalTransaction(activeSubsets, options.syncMode, transaction);
-      return client.push(createBatch(options.collection, client.clientId, transaction));
+      const result = await client.push(
+        createBatch(options.collection, client.clientId, transaction),
+      );
+      persistTransaction(offline, transaction);
+      return result;
     },
     onDelete: async ({ transaction }) => {
       trackLocalTransaction(activeSubsets, options.syncMode, transaction);
-      return client.push(createBatch(options.collection, client.clientId, transaction));
+      const result = await client.push(
+        createBatch(options.collection, client.clientId, transaction),
+      );
+      persistTransaction(offline, transaction);
+      return result;
     },
   } as CollectionConfig<T, TKey, TSchema>;
-}
-
-function trackLocalTransaction<T extends object, TKey extends string | number>(
-  subsets: SubsetTracker<T, TKey> | undefined,
-  syncMode: CollectionConfig<T, TKey>["syncMode"],
-  transaction: Pick<TransactionWithMutations<T>, "mutations">,
-): void {
-  if (syncMode !== "on-demand" || !subsets) {
-    return;
-  }
-
-  for (const mutation of transaction.mutations) {
-    if (mutation.type === "delete") {
-      subsets.deleteKey(mutation.key as TKey);
-      continue;
-    }
-
-    subsets.reconcileRow(mutation.modified as T);
-  }
 }

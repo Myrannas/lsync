@@ -72,6 +72,13 @@ export interface ReconnectOptions {
   maxAttempts?: number;
 }
 
+export interface IndexedDBOfflineOptions {
+  /** IndexedDB database shared by lsync collections. @default "lsync" */
+  databaseName?: string;
+  /** Change this value when cached rows are no longer schema-compatible. @default 1 */
+  cacheVersion?: string | number;
+}
+
 export type CollectionConnectionOptions =
   | {
       url: string | URL;
@@ -101,6 +108,8 @@ export type CollectionOptions<
   ignoreOwnUpdates?: boolean;
   maxSyncRows?: number | false;
   read?: false | Omit<ReadQuery, "collection">;
+  /** Hydrate this eager collection from IndexedDB before connecting to the server. */
+  offline?: boolean | IndexedDBOfflineOptions;
 } & CollectionConnectionOptions;
 
 export interface Client<TApi extends ApiContract = ApiContract> {
