@@ -9,6 +9,7 @@ interface SharedClientEntry {
 export interface SharedClientLease<TApi extends ApiContract = ApiContract> {
   readonly client: Client<TApi>;
   release(): void;
+  [Symbol.dispose](): void;
 }
 
 const sharedClients = new Map<string, SharedClientEntry>();
@@ -25,17 +26,20 @@ export function acquireSharedClient<TApi extends ApiContract = ApiContract>(
   entry.refs += 1;
 
   let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    entry.refs -= 1;
+    if (entry.refs === 0 && sharedClients.get(key) === entry) {
+      sharedClients.delete(key);
+      entry.client.close();
+    }
+  };
+
   return {
     client: entry.client as Client<TApi>,
-    release() {
-      if (released) return;
-      released = true;
-      entry.refs -= 1;
-      if (entry.refs === 0 && sharedClients.get(key) === entry) {
-        sharedClients.delete(key);
-        entry.client.close();
-      }
-    },
+    release,
+    [Symbol.dispose]: release,
   };
 }
 

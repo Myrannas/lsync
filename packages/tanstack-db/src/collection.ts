@@ -216,7 +216,7 @@ export function collectionOptions<
                 activeSubsets = undefined;
               }
               session.stop();
-              lease?.release();
+              lease?.[Symbol.dispose]();
             },
           };
         }
@@ -226,7 +226,7 @@ export function collectionOptions<
             activeSubsets = undefined;
           }
           session.stop();
-          lease?.release();
+          lease?.[Symbol.dispose]();
         };
       },
       rowUpdateMode: "partial",

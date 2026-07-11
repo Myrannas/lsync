@@ -1,6 +1,7 @@
 import { encodeServerMessage, parseClientRpcRequest } from "@lsync/transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createClient } from "../src/client";
+import { rejectPending, type PendingRequest } from "../src/client-rpc";
 
 describe("client connection lifecycle", () => {
   const originalWebSocket = globalThis.WebSocket;
@@ -13,6 +14,26 @@ describe("client connection lifecycle", () => {
   afterEach(() => {
     vi.useRealTimers();
     globalThis.WebSocket = originalWebSocket;
+  });
+
+  it("settles every pending request when one rejection callback throws", () => {
+    const settled: Array<string> = [];
+    const pending = new Map<string, PendingRequest>([
+      [
+        "first",
+        {
+          resolve: () => {},
+          reject: () => {
+            throw new Error("callback failed");
+          },
+        },
+      ],
+      ["second", { resolve: () => {}, reject: () => settled.push("second") }],
+    ]);
+
+    expect(() => rejectPending(pending, new Error("socket closed"))).not.toThrow();
+    expect(settled).toEqual(["second"]);
+    expect(pending).toHaveLength(0);
   });
 
   it("rejects an in-flight RPC when its socket closes", async () => {
