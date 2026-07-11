@@ -13,8 +13,9 @@ The example and integration-test workspaces are private and are never published.
 
 1. Create or confirm the `lsync` organization at npmjs.com.
 2. Ensure your npm account can publish public packages in that organization.
-3. Confirm the package versions being released. The initial public version is `0.0.1`; `0.0.0` is
-   a protected placeholder and the publish script will reject it.
+3. Update all public package versions together with `vp run version:packages -- 0.0.2`, replacing
+   `0.0.2` with the intended release. Add `--dry-run` to preview the changes. `0.0.0` is a protected
+   placeholder and the publish script will reject it.
 4. Run `vp run publish:packages:dry-run` and inspect the package contents.
 5. For the first release, either authenticate locally and run `vp run publish:packages`, or add a
    granular automation token as the `NPM_TOKEN` GitHub repository secret and dispatch the publish

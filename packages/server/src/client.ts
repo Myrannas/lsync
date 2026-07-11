@@ -1,3 +1,9 @@
+/**
+ * Shared types for custom clients and server integrations.
+ *
+ * @module @lsync/server/client
+ */
+
 export { router, type Context, type Router } from "./router";
 export type {
   ApiCall,

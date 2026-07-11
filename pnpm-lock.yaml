@@ -80,6 +80,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 5.20260705.1
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.2
       typedoc:
         specifier: 'catalog:'
         version: 0.28.20(typescript@6.0.3)

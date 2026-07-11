@@ -1,3 +1,9 @@
+/**
+ * Transport contracts, messages, and read-expression helpers.
+ *
+ * @module @lsync/transport
+ */
+
 export {
   apiCallSchema,
   batchSchema,

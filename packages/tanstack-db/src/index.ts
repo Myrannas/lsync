@@ -1,3 +1,9 @@
+/**
+ * TanStack DB collection adapters and client APIs.
+ *
+ * @module @lsync/client
+ */
+
 export { createBatch, toChangeMessage } from "./batch";
 export { createClient } from "./client";
 export { collectionOptions } from "./collection";
