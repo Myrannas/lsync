@@ -43,6 +43,6 @@ export default defineConfig({
         ],
       },
     ],
-    socialLinks: [{ icon: "github", link: "https://github.com/michaeloates/lsync" }],
+    socialLinks: [{ icon: "github", link: "https://github.com/myrannas/lsync" }],
   },
 });
