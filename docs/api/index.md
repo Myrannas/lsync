@@ -1,11 +1,11 @@
-# API Overview
+# API overview
 
-The [API reference](/api/reference/) documents the public APIs for `@lsync/definitions`,
+The [API reference](/api/reference/) lists the public APIs for `@lsync/definitions`,
 `@lsync/server`, `@lsync/client`, and `@lsync/transport`.
 
-## Common Entry Points
+## Common entry points
 
-| API                                   | Package              | Use                                                                |
+| API                                   | Package              | Purpose                                                            |
 | ------------------------------------- | -------------------- | ------------------------------------------------------------------ |
 | `defineCollections()`                 | `@lsync/definitions` | Define shared schemas, keys, child collections, and API contracts. |
 | `CollectionShardDurableObject.from()` | `@lsync/server`      | Add indexes, initial data, access rules, references, and handlers. |
@@ -14,8 +14,8 @@ The [API reference](/api/reference/) documents the public APIs for `@lsync/defin
 | `collectionTypesFrom()`               | `@lsync/client`      | Build typed client managers from the shared definition.            |
 | `eq`, `and`, `or`, `inArray`          | `@lsync/server`      | Build serializable read and access expressions.                    |
 
-## Public API Boundaries
+## Public API boundaries
 
-Use `@lsync/definitions` in portable contract modules, `@lsync/server` in Worker and Durable Object
-code, and `@lsync/client` in application code. `@lsync/transport` is available for custom transport
+Use `@lsync/definitions` in shared contract modules, `@lsync/server` in Worker and Durable Object
+code, and `@lsync/client` in application code. Use `@lsync/transport` for custom transport
 integrations.

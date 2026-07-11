@@ -1,10 +1,10 @@
-# Permissions And Access Patterns
+# Permissions and access control
 
-Access rules are server-only overrides on a shared collection definition. Read rules filter rows
-for reads, history replay, and subscription broadcasts; write and API rules reject unauthorized
+Access rules are server-only overrides on a shared collection definition. Read rules filter rows for
+reads, history replay, and subscription broadcasts. Write and API rules reject unauthorized
 operations.
 
-## Owner-Only Rows
+## Owner-only rows
 
 ```ts
 const shardOptions = CollectionShardDurableObject.from(appCollections)
@@ -32,7 +32,7 @@ export class CollectionShard extends CollectionShardDurableObject {
 }
 ```
 
-## Permission Types
+## Permission types
 
 | Type         | Behavior                                                                  |
 | ------------ | ------------------------------------------------------------------------- |
@@ -55,10 +55,10 @@ const shardOptions = CollectionShardDurableObject.from(appCollections)
   .build();
 ```
 
-## Document Reference Checks
+## Document reference checks
 
-Use a named reference when a child document inherits access from a stored parent document. First,
-represent the relationship in the shared definition:
+Use a named reference when a child document inherits access from a stored parent document. Declare
+the relationship in the shared definition:
 
 ```ts
 export const appCollections = defineCollections()
@@ -73,7 +73,7 @@ export const appCollections = defineCollections()
   .build();
 ```
 
-Then resolve the parent row from the concrete child scope and use its fields in the expression:
+In the child scope, resolve the parent row and use its fields in the access expression:
 
 ```ts
 const shardOptions = CollectionShardDurableObject.from(appCollections)
@@ -91,7 +91,7 @@ const shardOptions = CollectionShardDurableObject.from(appCollections)
   .build();
 ```
 
-The server reduces referenced fields against the stored parent row. Subscriptions track those
+The server evaluates referenced fields against the stored parent row. Subscriptions track those
 dependencies and are invalidated when a referenced permission field changes.
 
 Keep access expressions deterministic. Use document APIs for side effects and access rules for

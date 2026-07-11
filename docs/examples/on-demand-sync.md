@@ -1,6 +1,6 @@
-# On-Demand Sync
+# On-demand sync
 
-Use on-demand sync when a view only needs the rows selected by its active live query. The adapter
+Use on-demand sync when a view needs only the rows selected by its active live query. The adapter
 loads each server-side subset and releases it when the query unmounts.
 
 ```ts
@@ -30,6 +30,6 @@ const { data } = useLiveQuery(
 );
 ```
 
-On-demand reads support field comparisons, compound predicates, JSON-field ordering, limits,
-offsets, and cursor predicates for ordered pagination. The shared definition keeps schemas, keys,
-child paths, and document APIs aligned with the server.
+On-demand reads support field comparisons, compound predicates, JSON-field ordering, limits, offsets,
+and cursor predicates for ordered pagination. The shared definition keeps schemas, keys, child paths,
+and document APIs consistent with the server.

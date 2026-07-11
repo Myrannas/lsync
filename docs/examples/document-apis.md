@@ -1,10 +1,9 @@
-# Adding Document APIs
+# Adding document APIs
 
-Collection APIs are document-level commands that run server-side, such as archiving, duplicating,
-or applying a validated multi-row mutation. Define the contract once, then provide the handler on
-the server.
+Document APIs are server-side commands for a collection, such as archiving, duplicating, or applying
+a validated multi-row mutation. Define the contract once, then implement its server handler.
 
-## Shared Contract
+## Shared contract
 
 ```ts
 import { defineCollections } from "@lsync/definitions";
@@ -28,7 +27,7 @@ export const appCollections = defineCollections()
   .build();
 ```
 
-## Server Handler
+## Server handler
 
 ```ts
 const shardOptions = CollectionShardDurableObject.from(appCollections)
@@ -52,7 +51,7 @@ const shardOptions = CollectionShardDurableObject.from(appCollections)
   .build();
 ```
 
-## Typed Client Call
+## Typed client call
 
 ```ts
 import { collectionTypesFrom } from "@lsync/client";
@@ -67,5 +66,5 @@ console.log(result.watermark);
 ```
 
 The input and output schemas live in `@lsync/definitions`, so the server handler and client call use
-the same inferred types. Add `.access("api.archive", handler)` on the server override when the
+the same inferred types. Add `.access("api.archive", handler)` to the server override when the
 command needs a separate permission check.
